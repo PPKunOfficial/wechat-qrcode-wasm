@@ -10,10 +10,6 @@ param(
     [string]$OpenCVSrc = $env:OPENCV_SRC,
     [string]$BuildDir,
     [switch]$Reconfigure,
-    # Minimal-size profile (used for the release `wq.min.*` artifact): compile with -Os and
-    # put every function/data in its own section, so the wasm link (-Wl,--gc-sections) can
-    # drop the OpenCV dnn layers and core helpers that the QRCode pipeline never calls.
-    [switch]$MinSize
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,15 +31,10 @@ if ($Reconfigure -and (Test-Path $BuildDir)) {
 }
 New-Item -ItemType Directory -Force $BuildDir | Out-Null
 
-# Release (default): -O2, faster decode. MinSize: -Os + one section per symbol; the linker
-# then garbage-collects unused code, which is where most of the size win comes from.
-if ($MinSize) {
-    $buildType = 'MinSizeRel'
-    $optimizationFlags = '-Os -DNDEBUG -ffunction-sections -fdata-sections'
-} else {
-    $buildType = 'Release'
-    $optimizationFlags = '-O2'
-}
+# -O2: full decode speed. The wasm is small because the unused dnn layer registrations
+# are trimmed at build time (tools/trim_dnn_registry.py), not because of -Os.
+$buildType = 'Release'
+$optimizationFlags = '-O2'
 $cFlags = "$optimizationFlags -DOPENCV_HAVE_FILESYSTEM_SUPPORT=1"
 
 # Keep this list in sync with docs/build.md.

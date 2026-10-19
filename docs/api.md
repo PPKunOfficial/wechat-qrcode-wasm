@@ -2,14 +2,12 @@
 
 `web/scanner.js` 是唯一的公开入口（ESM）。它负责加载 wasm、把 `.onnx` 模型写进 Emscripten 的内存文件系统、把像素拷进堆、调用 C 导出函数、把 JSON 解析成 JS 对象。
 
-## 两套构建产物
+## 构建产物
 
-`dist/` 里有标准版（`wq.js` + `wq.wasm`，7.44 MB，gzip 1.63 MB）和最小体积版（`wq.min.js` + `wq.min.wasm`，5.67 MB，gzip 1.30 MB）。两者 API、准确率完全一致，只有体积和速度差别（min 单帧慢约 45%）。
-
-不传 `moduleFactory` 时 `createScanner` 用标准版；要用最小版就自己 import 对应工厂（wasm 文件由 Emscripten 按 JS 的 `import.meta.url` 自动定位到同目录）：
+`dist/` 里是单一一套产物：`wq.js` + `wq.wasm`（4.17 MB，gzip 0.97 MB，`-O3` 构建、dnn 层已裁剪，见 [build.md](build.md#dnn-层裁剪)）。默认情况下 `createScanner` 自己 import `dist/wq.js`；想自己控制加载时机（例如放进 Worker、或改 wasm 路径）可以传 `moduleFactory`：
 
 ```js
-import createWeChatQRCodeModule from './dist/wq.min.js';
+import createWeChatQRCodeModule from './dist/wq.js';
 const scanner = await createScanner({ detectModel, srModel, moduleFactory: createWeChatQRCodeModule });
 ```
 

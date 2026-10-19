@@ -36,21 +36,13 @@ jobs:
       - name: Node accuracy tests (29 single-code + 4 multi-code)
         run: npm test
 
-      - name: Node accuracy tests (minimal-size build)
-        run: node tests/run-tests.mjs --variant min --tiles 2
-
-      - name: Benchmark vs zxing-wasm / jsQR (standard + min build)
-        run: node tests/benchmark.mjs --tiles 2 --min
+      - name: Benchmark vs zxing-wasm / jsQR
+        run: node tests/benchmark.mjs --tiles 2
 
       - name: Real-browser verification (headless Chrome)
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: npm run test:browser
-
-      - name: Real-browser verification (minimal-size build)
-        env:
-          CHROME_PATH: /usr/bin/google-chrome
-        run: node tests/browser/run-browser-test.mjs --variant min
 
       - name: Upload screenshots
         if: always()
@@ -59,5 +51,4 @@ jobs:
           name: browser-screenshots
           path: |
             build/browser-tests.png
-            build/browser-tests-min.png
-          if-no-files-found: ignore
+            if-no-files-found: ignore

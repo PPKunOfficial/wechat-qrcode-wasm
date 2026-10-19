@@ -4,12 +4,17 @@
 #   lib/libopencv_core.a, libopencv_imgproc.a, libopencv_flann.a,
 #   lib/libopencv_geometry.a, lib/libopencv_dnn.a, lib/libopencv_wechat_qrcode.a
 #   + lib/libprotobuf.a, lib/libzlib.a (3rdparty) copied by the install step.
+#
+# Unless -FullDnn is given, modules/dnn/src/init.cpp is first trimmed to the layer
+# registrations the bundled WeChat models need (tools/trim_dnn_registry.py). The dnn
+# registry keeps every layer implementation reachable through a function pointer, so
+# without the trim the wasm binary carries ~3.4 MB of layers this scan never uses.
 param(
     [int]$Jobs = 0,
     [switch]$SkipConfigure,
     [switch]$Reconfigure,
-    # Build the minimal-size variant (build/opencv-wasm-min by default).
-    [switch]$MinSize,
+    # Keep the complete dnn layer registry (supports arbitrary ONNX models, ~7.8 MB wasm).
+    [switch]$FullDnn,
     [string]$OpenCVSrc = $env:OPENCV_SRC,
     [string]$BuildDir
 )
@@ -23,17 +28,23 @@ $paramBuildDir = $BuildDir
 if ($paramOpenCVSrc) { $OpenCVSrc = $paramOpenCVSrc } else { $OpenCVSrc = $script:OpenCvSrc }
 if ($paramBuildDir) {
     $BuildDir = $paramBuildDir
-} elseif ($MinSize) {
-    $BuildDir = Join-Path $script:BuildRoot 'opencv-wasm-min'
 } else {
     $BuildDir = $script:OpenCvBuild
 }
 if ($Jobs -le 0) { $Jobs = [Environment]::ProcessorCount }
 
+if (-not $FullDnn) {
+    $trimScript = Join-Path $script:RepoRoot 'tools\trim_dnn_registry.py'
+    if (-not (Test-Path $trimScript)) { throw "trim script not found: $trimScript" }
+    Write-Host "Trimming unused dnn layer registrations (use -FullDnn to keep all of them)"
+    & python $trimScript --opencv $OpenCVSrc
+    if ($LASTEXITCODE -ne 0) { throw "dnn registry trim failed (exit $LASTEXITCODE)" }
+}
+
 if (-not $SkipConfigure -or $Reconfigure) {
-    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -MinSize:$MinSize -Reconfigure:$Reconfigure
+    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -Reconfigure:$Reconfigure
 } elseif (-not (Test-Path (Join-Path $BuildDir 'build.ninja'))) {
-    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -MinSize:$MinSize
+    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir
 }
 
 if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {

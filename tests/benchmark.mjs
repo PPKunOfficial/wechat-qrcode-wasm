@@ -8,9 +8,8 @@
  * not a useful accuracy benchmark for WeChat's detector + super-resolution pipeline.
  *
  * Usage:
- *   node tests/benchmark.mjs [--filter hard] [--tiles 2] [--min] [--json build/benchmark.json] [--md BENCHMARK.md]
+ *   node tests/benchmark.mjs [--filter hard] [--tiles 2] [--json build/benchmark.json] [--md BENCHMARK.md]
  *
- * --min also measures dist/wq.min.js (the minimal-size build, see docs/build.md) as a separate row,
  * so the size/accuracy/latency trade-off is reproducible instead of hand-edited into the report.
  *
  * zxing-wasm and jsQR are devDependencies (npm install); the script degrades gracefully
@@ -30,15 +29,14 @@ const flag = (name, fallback = null) => {
 };
 const filter = flag('--filter');
 const tiles = Number(flag('--tiles', '0'));
-const withMin = args.includes('--min');
 const jsonOut = flag('--json', join(repoRoot, 'build', 'benchmark.json'));
 const mdOut = flag('--md');
 
 /** @type {{name: string, label: string, decode: Function}[]} */
 const decoders = [];
 
-async function initWeChat(variant = 'default') {
-  const scanner = await loadWrapper({ variant });
+async function initWeChat() {
+  const scanner = await loadWrapper();
   return {
     decode: (rgba, width, height) => {
       const result = scanRgba(scanner, rgba, width, height, { tiles });
@@ -108,10 +106,6 @@ async function main() {
 
   const wechat = await initWeChat();
   decoders.push({ name: 'wechat', label: 'OpenCV wechat_qrcode (this repo)', ...wechat });
-  if (withMin) {
-    const wechatMin = await initWeChat('min');
-    decoders.push({ name: 'wechat-min', label: 'wechat_qrcode, min build (5.67 MB)', ...wechatMin });
-  }
   const zxing = await initZXing();
   if (zxing) decoders.push({ name: 'zxing-wasm', label: 'zxing-wasm', ...zxing });
   const jsqr = await initJsQR();
@@ -183,12 +177,6 @@ async function main() {
     'Multi-code scenes are excluded here (jsQR decodes a single code per call); they are covered by tests/run-tests.mjs.\n',
   );
   md.push(`Decoder configuration: tiled fallback ${tiles > 1 ? `${tiles}x${tiles}` : 'disabled'} for wechat_qrcode.`);
-  if (withMin) {
-    md.push(
-      'The `min build` row is `dist/wq.min.wasm` (`-MinSize`: `-Os` + `-ffunction-sections` + `--gc-sections` +',
-      '`-sMALLOC=emmalloc` + `--closure 1`); identical pipeline and accuracy, only code-size-for-speed trade-off.\n',
-    );
-  }
   md.push('| decoder | decoded | clean set | hard tier | avg latency |');
   md.push('| --- | --- | --- | --- | --- |');
   for (const s of summary) {

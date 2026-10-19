@@ -3,8 +3,7 @@
 [![CI](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/PPKunOfficial/wechat-qrcode-wasm)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![wasm: 7.4 MB](https://img.shields.io/badge/wasm-7.4%20MB%20%C2%B7%201.63%20MB%20gzip-654ff0)](dist/wq.wasm)
-[![wasm min: 5.7 MB](https://img.shields.io/badge/wasm%20min-5.7%20MB%20%C2%B7%201.30%20MB%20gzip-2ea44f)](dist/wq.min.wasm)
+[![wasm: 4.17 MB](https://img.shields.io/badge/wasm-4.17%20MB%20%C2%B7%200.97%20MB%20gzip-654ff0)](dist/wq.wasm)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](package.json)
 
 把 **OpenCV 5.x 的 `wechat_qrcode` 模块**（微信扫码同款算法：SSD 神经网络检测 + 超分辨率 + zxing 多二值化解码）完整编译成 WebAssembly，供前端在浏览器 / Web Worker / Node 中调用。没有原生插件、没有 ONNX Runtime：推理跑在 OpenCV 自己的 `dnn` 模块里，纯 WASM。
@@ -35,40 +34,23 @@
 - 唯一三边都没解出的是 `hard_text_zh_recompressed`（先缩到 0.35 再模糊再加噪声，已超出可恢复信息量），保留在基准里作为"极限"参照。
 - **多码同时识别**：一帧里的多个二维码一次调用全部返回（`count` / `results[]`），检测与解码都是上游本来就支持的路径。实测 2 码 / 3 码 / 同码重复 / 3×3 九宫格（1600×1100）全部完整返回，耗时仍 ~60 ms（9 码 ~70 ms）。回归测试见 `npm test` 的 multi-code 段。
 - 浏览器端自动化验证（真实 Chrome，`npm run test:browser`）：**14/14** 通过（含 2 码、3 码场景），单帧 57–65 ms（`hard_url_far` 走 4 块切图兜底，274 ms）。
-- 产物体积：标准版 `wq.wasm` 7.44 MB（gzip 1.63 MB）+ `wq.js` 70 KB；另有最小体积版 `wq.min.wasm` 5.67 MB（gzip 1.30 MB）+ `wq.min.js` 35 KB，准确率相同、单帧慢约 45%（见[两个体积版本](#两个体积版本)）。两个模型共 1 MB。
+- 产物体积：`wq.wasm` **4.17 MB**（gzip 0.97 MB）+ `wq.js` 70 KB。体积是构建期裁掉用不到的 dnn 层换来的，`-O3` 与单帧耗时均保持不变（见[体积](#体积)）。两个模型共 1 MB。
 
 ![demo 页面](docs/demo.png)
 
-## 两个体积版本
+## 体积
 
-`dist/` 里有两套等价的构建产物，API 完全相同，按体积/速度需要选一套：
+`dist/wq.wasm` **4.17 MB**（gzip 0.97 MB）+ `dist/wq.js` 70 KB，模型共 1 MB。构建是速度优先的 `-O3`；体积靠**裁掉用不到的 dnn 层**换来，机器码质量与单帧耗时都不受影响（~70 ms vs 未裁剪的 ~71 ms）。准确率：默认 27/29、`tiles: 2` 时 28/29（干净集 5/5，hard 档 8/10 → 9/10），浏览器 14/14。
 
-| 版本 | 文件 | 体积 | gzip (level 9) | 29 张测试集平均单帧 | 适合 |
-| --- | --- | --- | --- | --- | --- |
-| **标准版**（默认） | `dist/wq.js` + `dist/wq.wasm` | 7.44 MB | **1.63 MB** | ~71 ms | 速度优先（默认选择） |
-| **最小体积版** | `dist/wq.min.js` + `dist/wq.min.wasm` | 5.67 MB | **1.30 MB** | ~104 ms | 首屏/移动网络/体积敏感 |
+### 体积是怎么省下来的
 
-体积 −24%（gzip −21%），代价是单帧约 +45%。准确率完全一致：默认 27/29、`tiles: 2` 时 28/29（干净集 5/5，hard 档 8/10 → 9/10）。
+**dnn 层裁剪（默认构建，省 ~3.4 MB，速度不变）**：OpenCV `dnn` 在 `modules/dnn/src/init.cpp` 里把 200 多个层的实现用函数指针注册进工厂。函数指针表让链接器无法判断哪些层真正被用到，所以哪怕开了 `--gc-sections`，每个层的实现都还在 wasm 里（实测 7.80 MB 里 `dnn` 占 6.2 MB，而扫码只用得上 14 种层）。构建时 [tools/trim_dnn_registry.py](tools/trim_dnn_registry.py) 把用不到的 209 条注册注释掉，链接器就能把对应 `.o` 排除，wasm 从 7.80 MB 降到 **4.37 MB**，`-O3` 不变、速度不变。
 
-怎么用最小的那套：
+裁剪的代价是"只支持这 14 种层"：本仓库的 `detect.onnx`（Conv/Relu/Add/PriorBox/DetectionOutput/…）和 `sr.onnx`（Conv/LeakyRelu/ConvTranspose/Slice/…）刚好覆盖。要用别的 ONNX 网络就把 `tools/trim_dnn_registry.py` 的 `KEEP` 里加上缺的类型（报错信息会直接给出层名），或者用 `-FullDnn` 构建未裁剪版本（7.44 MB，支持任意 OpenCV dnn 能导入的模型）。
 
-```js
-// 1) 库：把默认的 dist/wq.js 换成 dist/wq.min.js（createScanner 的 moduleFactory）
-import createWeChatQRCodeModule from './dist/wq.min.js';
-const scanner = await createScanner({ detectModel, srModel, moduleFactory: createWeChatQRCodeModule });
-// 也支持 npm 子路径导出：import 'wechat-qrcode-wasm/wasm-min'
-```
+> 也试过用 `-Os` 再压体积：只能从 4.17 MB 降到 3.29 MB（gzip 0.97 → 0.77 MB），单帧却慢约 45%（70 → 101 ms）。扫码是实时交互场景，这个交换不划算，所以不发布小体积版。
 
-```bash
-# 2) demo：加 ?variant=min
-open http://127.0.0.1:5173/demo/?variant=min
-
-# 3) 测试：同一套语料跑最小版
-npm run test:min            # = node tests/run-tests.mjs --variant min
-node tests/browser/run-browser-test.mjs --variant min
-```
-
-体积是怎么省下来的（细节见 [docs/build.md](docs/build.md#最小体积构建min-profile)）：OpenCV 用 `-Os -ffunction-sections -fdata-sections` 编译、链接时 `-Wl,--gc-sections` 丢掉扫码路径用不到的代码，`-sMALLOC=emmalloc`、`--closure 1` 压缩 JS 胶水，最后 `-Oz` 让 Emscripten 跑二进制优化。功能、API、模型一个不少。
+细节（裁剪原理、如何重新生成 `KEEP` 列表、`-FullDnn` 全量构建）见 [docs/build.md](docs/build.md#dnn-层裁剪)。
 
 ## 快速开始
 
@@ -81,7 +63,7 @@ npm run serve        # http://127.0.0.1:5173/demo/
 
 `dist/` 里已带好构建产物（`wq.js` / `wq.wasm`），克隆即可用；重新构建见 [docs/build.md](docs/build.md)。
 
-不想拉整个仓库：到 [Releases](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases) 下载 `wq.wasm` + `wq.js`（标准版）或 `wq.min.wasm` + `wq.min.js`（最小体积版），模型文件在仓库的 `models/` 下（`detect.onnx` / `sr.onnx`，共约 1 MB）。
+不想拉整个仓库：到 [Releases](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases) 下载 `wq.wasm` + `wq.js`（4.17 MB），模型文件在仓库的 `models/` 下（`detect.onnx` / `sr.onnx`，共约 1 MB）。
 
 ### 作为库使用
 
@@ -112,15 +94,14 @@ API 细节（`scan` / `scanGray` / `scanImageURL` / 输入格式 / `scaleFactor`
 ```
 src/wq_wasm.cpp                 C API：wq_init / wq_scan / wq_result_json / …
 web/scanner.js                  ESM 封装（模型注入 MEMFS、扫描、切图兜底、结果解析）
-dist/wq.js, dist/wq.wasm        预编译产物（标准版）
-dist/wq.min.js, wq.min.wasm     预编译产物（最小体积版）
+dist/wq.js, dist/wq.wasm        预编译产物
 models/detect.onnx              官方检测模型（未修改）
 models/sr.onnx                  官方超分模型（修正了动态尺寸裁剪，见 tools/patch_sr_model.py）
 third_party/opencv_modules/     从 opencv_contrib 5.x 迁入的 wechat_qrcode 源码（改动见同目录 UPSTREAM.md）
 scripts/                        取源码 / 配置 / 编译 OpenCV 与 wasm / 静态服务器
 demo/                           摄像头扫码 demo
 tests/                          Node 测试、基准、浏览器自动化验证、生成的测试图
-tools/                          模型下载、SR 模型修补、测试集生成
+tools/                          模型下载、SR 模型修补、测试集生成、dnn 层裁剪
 docs/                           构建、架构、API 文档
 .github/workflows/ci.yml        CI：生成测试集 → 准确率 → 基准 → 真实 Chrome 验证
 NOTICE / THIRD_PARTY_NOTICES    归属声明与第三方许可
@@ -136,16 +117,13 @@ CONTRIBUTING.md                 贡献指南
 .\scripts\fetch-opencv.ps1
 
 # 2. 用 emscripten 交叉编译 OpenCV 静态库（core/imgproc/flann/geometry/dnn/wechat_qrcode）
+#    默认会裁剪 dnn 层注册（体积 7.80 → 4.37 MB）；加 -FullDnn 保留完整注册
 .\scripts\configure-opencv.ps1
 .\scripts\build-opencv.ps1
 
 # 3. 链接 wasm 模块
 .\scripts\build-wasm.ps1
 
-# 最小体积版（产物是 dist/wq.min.js + dist/wq.min.wasm）
-.\scripts\build-opencv.ps1 -MinSize
-.\scripts\build-wasm.ps1 -MinSize
-# 或者一条命令：npm run build:min
 ```
 
 细节、耗时、坑（模块白名单缓存、`opencv5` 安装目录、`liblibprotobuf.a`、ONNX 模型动态尺寸）见 [docs/build.md](docs/build.md)。
@@ -157,6 +135,7 @@ CONTRIBUTING.md                 贡献指南
 3. **OpenCV 以 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1` 编译**：Emscripten 下 OpenCV 默认关闭文件系统，而 `WeChatQRCode` 构造函数会 `CV_Assert(utils::fs::exists(model_path))`。打开后模型通过 Emscripten MEMFS 按路径加载。
 4. **JS 侧切图兜底**：检测网络总是把整帧缩放到 ~400×400，大图里的小码会小到检测不到；`scanner.scan(..., { tiles: 2 })` 用重叠切图恢复小码的相对尺寸。这是对上游能力的补充，默认关闭，不影响原算法路径。
 5. 不编译 `objdetect/calib3d/features2d/highgui/videoio/imgcodecs`，以控制 wasm 体积。
+6. **构建期裁剪 dnn 层注册**：`tools/trim_dnn_registry.py` 改写 OpenCV checkout 里的 `modules/dnn/src/init.cpp`（保留本仓库两个模型用到的 14 种层），让链接器丢掉用不到的层实现，wasm 7.80 → 4.37 MB 且速度不变；`build-opencv.ps1 -FullDnn` 可跳过裁剪。
 
 ## 已知限制
 
@@ -164,6 +143,7 @@ CONTRIBUTING.md                 贡献指南
 - 可选切图兜底会使最坏耗时到 ~300 ms（1600×1200 分 4 块），适合拍照/上传，不适合实时视频。
 - wasm 未启用 SIMD（浏览器覆盖率考虑），开 `-msimd128` 可再快一些，但会要求较新的浏览器。
 - 5.x 分支是开发版（`OpenCV 5.1.0-dev`）；上游若改动了 ONNX 导入器行为需重新验证。
+- 默认构建裁剪了 dnn 层注册（只保留两个模型用到的 14 种层），加载其它 ONNX 网络会报 `layer not found`；需要通用推理时用 `-FullDnn` 构建。
 - 极低信息量的图（如二次压缩 + 强噪声）任何解码器都无解，属正常。
 
 ## 许可与归属

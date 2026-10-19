@@ -65,7 +65,7 @@ scanner.scan(canvas)
 
 ### 1. 为什么不用 opencv.js
 
-官方 `opencv.js` 的模块集合固定，**不含 `wechat_qrcode`**，也不含它的依赖链（`geometry`、`dnn` 的 ONNX 导入器常被裁掉）。如果基于 opencv.js，要么重编整份 opencv.js（体积 8 MB+ 且带一堆用不到的模块），要么自己写绑定。这里改为：`BUILD_LIST` 只留 `core,imgproc,flann,geometry,dnn,wechat_qrcode`，再用 ~200 行 C API 替代 JS 绑定层，最终 7.4 MB wasm（其中 dnn 的 protobuf 解析器占大头）。
+官方 `opencv.js` 的模块集合固定，**不含 `wechat_qrcode`**，也不含它的依赖链（`geometry`、`dnn` 的 ONNX 导入器常被裁掉）。如果基于 opencv.js，要么重编整份 opencv.js（体积 8 MB+ 且带一堆用不到的模块），要么自己写绑定。这里改为：`BUILD_LIST` 只留 `core,imgproc,flann,geometry,dnn,wechat_qrcode`，再用 ~200 行 C API 替代 JS 绑定层，最终 4.17 MB wasm（未做 dnn 层裁剪时 7.44 MB，其中 dnn 占 6.2 MB）。
 
 ### 2. 模块 CMakeLists 的改动
 
@@ -106,7 +106,11 @@ scanner.scan(canvas)
 
 构建不启用 pthread（`-pthread`/`SharedArrayBuffer` 都不需要），所以可以在任何静态托管上跑、也不需要 COOP/COEP 响应头。OpenCV 的 `Parallel framework: none`。代价是 `dnn::forward` 单线程执行，一帧 60~70 ms。
 
-如果要更快：`-msimd128`（需要较新浏览器）、`-O3 -flto`、或把预览分辨率降到 640×480。`scripts/build-wasm.ps1 -Optimization -Os` 可以换体积优化，代价是速度。
+如果要更快：`-msimd128`（需要较新浏览器）、`-O3 -flto`、或把预览分辨率降到 640×480。
+
+### 7. dnn 层裁剪（体积）
+
+`wechat_qrcode` 只用得上 14 种 dnn 层，但 OpenCV 的 `init.cpp` 把 200 多个层实现注册进 `LayerFactory`（函数指针表）。链接器无法判断这些实现"没人调用"，`--gc-sections` 也丢不掉它们，于是默认构建会先由 `tools/trim_dnn_registry.py` 注释掉用不到的注册，再编译。结果 wasm 7,803,995 → 4,373,639 字节（−44%），**机器码优化级别不变，单帧耗时不变**。代价是"只认识这 14 种层"：换成别的 ONNX 网络会报 `layer not found`，需要往 `KEEP` 里补类型或用 `-FullDnn` 构建。体积优先（`-Os`）的构建实测只能再省 0.65 MB、单帧却慢 45%，已放弃，仓库只发布这一套速度优先的产物。细节见 [build.md](build.md#dnn-层裁剪)。
 
 ## 目录职责
 
@@ -117,7 +121,7 @@ scanner.scan(canvas)
 | `third_party/opencv_modules/wechat_qrcode` | 上游模块源码（含 zxing 移植），仅改 `CMakeLists.txt` |
 | `models/` | ONNX 模型（detect 官方、sr 修补版）+ 原始文件 + license |
 | `scripts/` | 取源码、配置/编译 OpenCV、链接 wasm、静态服务器、一键构建 |
-| `tools/` | 模型下载/修补、测试集生成（Python） |
+| `tools/` | 模型下载/修补、测试集生成、dnn 层裁剪（Python） |
 | `tests/` | Node 冒烟/准确率/基准、浏览器自动化、生成的测试图 |
 | `demo/` | 摄像头扫码页面（真实浏览器验证过） |
 | `docs/` | 构建、API、架构文档 |
@@ -133,3 +137,4 @@ scanner.scan(canvas)
 | 文件系统 | 桌面 stat | 打开 `OPENCV_HAVE_FILESYSTEM_SUPPORT` + MEMFS |
 | 小码检测 | 仅整图缩放 | 额外提供 JS 切图兜底（可选） |
 | 线程 | 可用 | 单线程 |
+| dnn 层注册 | 全量 200+ 种层 | 默认裁剪到模型用到的 14 种（`-FullDnn` 保留全量） |

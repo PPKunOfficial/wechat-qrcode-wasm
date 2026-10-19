@@ -10,36 +10,35 @@
 
 ```bash
 npm install              # 测试/基准依赖
-npm run serve            # http://127.0.0.1:5173/demo/（加 ?variant=min 用最小体积版）
+npm run serve            # http://127.0.0.1:5173/demo/
 npm test                 # Node 冒烟 + 准确率（29 张单码 + 4 张多码场景）
-npm run test:min         # 同一套语料跑 dist/wq.min.js（最小体积版）
 npm run bench            # 对比 zxing-wasm / jsQR，写 BENCHMARK.md
 npm run test:browser     # 真实 Chrome（puppeteer-core）跑 14 张图（含多码）
 npm run assets           # 重新生成测试集（python + segno/pillow/numpy）
 npm run build            # 全量重建（OpenCV 源码在 .cache/opencv 或 $env:OPENCV_SRC）
-npm run build:min        # 重建最小体积版：dist/wq.min.js + dist/wq.min.wasm
 ```
 
-产物：标准版 `dist/wq.js` + `dist/wq.wasm`（7.44 MB），最小体积版 `dist/wq.min.js` + `dist/wq.min.wasm`（5.67 MB），都已提交，可省略构建。模型在 `models/`。
+产物：`dist/wq.js` + `dist/wq.wasm`（4.17 MB，`-O3` + dnn 层裁剪），已提交，可省略构建。模型在 `models/`。
 
 ## 硬性约束
+
+- 默认构建会裁剪 dnn 层注册（`tools/trim_dnn_registry.py`，`init.cpp` 里只保留两个模型用到的 14 种层）。换模型后若报 `layer not found`，把层名加进脚本的 `KEEP` 再重建；要通用推理用 `build-opencv.ps1 -FullDnn`。
 
 - **不要动 `third_party/opencv_modules/wechat_qrcode/src/` 下的算法代码**。它是 opencv_contrib 5.x 的副本；要修行为优先改 JS 层或模型。若确需改源码，同步更新 `third_party/opencv_modules/wechat_qrcode/UPSTREAM.md`（若不存在则新建，记录上游 commit 与补丁理由）。
 - `models/detect.onnx` 必须保持官方原文件（sha1 校验在 `tools/fetch_models.py`）。`models/sr.onnx` 是由 `tools/patch_sr_model.py` 生成的补丁版本，不要用原始 sr 模型替换。
 - OpenCV 构建必须带 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1`，否则 `wq_init` 在 `CV_Assert(utils::fs::exists())` 抛 `StsNotImplemented`。
 - 改 `BUILD_LIST` / 模块集合后必须用 `configure-opencv.ps1 -Reconfigure`（清 build 目录），否则 CMake cache 里的 `BUILD_opencv_*=OFF` 会让模块静默消失。
+- 体积基线：`dist/wq.wasm` 应为 4,373,639 字节（±2%）。明显变大通常意味着裁剪没生效（检查 build 日志里的 `Trimming unused dnn layer registrations`）。
 - 不要引入 pthread：单线程是"任意静态托管可用、无需 COOP/COEP"的前提。
 - 不要把 `tests/assets/`（约 94 MB 生成物：PNG + 原始 RGBA）提交进仓库。
-- `dist/wq.min.*` 只能由 `-MinSize` 构建产生（`build/opencv-wasm-min`，OpenCV 编译参数 `-Os -ffunction-sections -fdata-sections`，链接 `-Oz -Wl,--gc-sections -sMALLOC=emmalloc --closure 1`）；不要手工在 wasm 上再跑 `wasm-opt`（feature 集合不对会生成 ID 非法的模块）。
-- 标准版与最小版的 API/准确率必须保持一致；改 `src/wq_wasm.cpp` 或 `web/scanner.js` 后两套产物都要重新构建、重跑测试。
+- 体积/性能取舍：只发布 `-O3` 的单一产物。`-Os`/`-Oz` 小体积版实测单帧慢约 45%、只省 0.65 MB，已否决；不要手工在 wasm 上再跑 `wasm-opt`（feature 集合不对会生成 ID 非法的模块）。
 
 ## 验证要求（改完必须跑）
 
 1. `npm test` → 期望 `decoded 27/29 assets`、`clean reference set: 5/5`、`hard tier: 8/10`（不开切图），且 multi-code 段 4/4 PASS（2 码、3 码、同码重复、3×3 九宫格）。
-2. `npm run bench`（= `node tests/benchmark.mjs --tiles 2 --min --md BENCHMARK.md`）→ 期望 wechat_qrcode 28/29、min 行 28/29，且 BENCHMARK.md 被更新。
+2. `npm run bench`（= `node tests/benchmark.mjs --tiles 2 --md BENCHMARK.md`）→ 期望 wechat_qrcode 28/29，且 BENCHMARK.md 被更新。
 3. `npm run test:browser` → 期望 `browser: decoded 14/14`，退出码 0。它需要本机 Chrome（puppeteer-core 通过 `CHROME_PATH` 或默认路径找）。
-4. `npm run test:min` → 最小体积版同一准确率：`decoded 27/29`、`hard tier: 8/10`（`--tiles 2` 时 28/29 / 9/10，但会更慢）；`node tests/browser/run-browser-test.mjs --variant min` 期望 `14/14`。
-5. 改了 JNI/wasm 导出 → 先 `npm run build`（和/或 `npm run build:min`）再跑上面几项。
+4. 改了 JNI/wasm 导出 → 先 `npm run build` 再跑上面几项。
 
 已知唯一"该失败"的用例：`hard_text_zh_recompressed`（信息量已被破坏），任何解码器都解不出，别试图调参让它通过。
 
@@ -55,6 +54,6 @@ npm run build:min        # 重建最小体积版：dist/wq.min.js + dist/wq.min.
 - `src/wq_wasm.cpp` — C ABI（`wq_init/wq_scan/wq_result_json/wq_last_error/wq_reset/wq_opencv_version`）
 - `web/scanner.js` — 公开 API（`createScanner`，`scan/scanGray/scanImageURL`，`tiles` 兜底）
 - `scripts/` — `_env.ps1`、`fetch-opencv`、`configure-opencv`、`build-opencv`、`build-wasm`、`build-all.mjs`、`serve.mjs`
-- `tools/` — `fetch_models.py`、`patch_sr_model.py`、`gen_test_assets.py`
+- `tools/` — `fetch_models.py`、`patch_sr_model.py`、`gen_test_assets.py`、`trim_dnn_registry.py`
 - `tests/` — `_harness.mjs`、`run-tests.mjs`、`benchmark.mjs`、`browser/`
 - `demo/` — 摄像头扫码页

@@ -3,7 +3,6 @@
  * a real browser (canvas -> ImageData -> web/scanner.js), then prints a pass/fail table.
  *
  * Open http://127.0.0.1:5173/tests/browser/ with scripts/serve.mjs running.
- * Add ?variant=min to run the minimal-size build (dist/wq.min.js) instead.
  */
 
 import { createScanner } from '../../web/scanner.js';
@@ -12,7 +11,6 @@ const statusEl = document.getElementById('status');
 const rowsEl = document.getElementById('rows');
 const summaryEl = document.getElementById('summary');
 
-const variant = new URLSearchParams(location.search).get('variant') === 'min' ? 'min' : 'default';
 
 /** Picks a representative subset so the page stays fast. */
 const WANTED = [
@@ -71,12 +69,12 @@ async function main() {
     detectModel: '../../models/detect.onnx',
     srModel: '../../models/sr.onnx',
     moduleFactory:
-      variant === 'min' ? (await import('../../dist/wq.min.js')).default : undefined,
+      undefined,
     print: () => {},
     printErr: (msg) => console.warn('[wasm]', msg),
   });
   setStatus(
-    `ready · ${variant} build · OpenCV ${scanner.opencvVersion} · module+models ${Math.round(performance.now() - t0)} ms · ` +
+    `ready · OpenCV ${scanner.opencvVersion} · module+models ${Math.round(performance.now() - t0)} ms · ` +
       `detect ${scanner.formatBytes(scanner.modelInfo.detectBytes)} / sr ${scanner.formatBytes(scanner.modelInfo.srBytes)}`,
   );
 

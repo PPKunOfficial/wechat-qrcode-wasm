@@ -84,28 +84,24 @@ CV_Assert(utils::fs::exists(detector_model_path));
 - 安装目录布局（OpenCV 5.x 与 4.x 不同）：头文件在 `install/include/opencv5/opencv2/...`；模块库在 `install/lib/libopencv_*.a`；第三方静态库在 `install/lib/opencv5/3rdparty/`，且名字带双 `lib` 前缀（`liblibprotobuf.a`、`libzlib.a`、`liblibharfbuzz.a`）。
 - 静态库用 `-Wl,--start-group ... -Wl,--end-group` 包住，避免循环依赖。
 - Emscripten 关键 flag：`-fexceptions -sDISABLE_EXCEPTION_CATCHING=0`（OpenCV 用 `cv::Exception`，必须让异常穿过 wasm 边界）、`-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createWeChatQRCodeModule`、`-sFORCE_FILESYSTEM=1`、`-sALLOW_MEMORY_GROWTH=1`、`-sINITIAL_MEMORY=67108864`、`-sSTACK_SIZE=5242880`、`-sENVIRONMENT=web,worker,node`。
-- 链接完成后 `dist/wq.wasm` 约 7.4 MB（gzip 1.63 MB），`dist/wq.js` 约 70 KB。
+- 链接完成后 `dist/wq.wasm` 约 4.17 MB（gzip 0.97 MB），`dist/wq.js` 约 70 KB。没做 dnn 层裁剪（`-FullDnn`）时是 7.44 MB（gzip 1.63 MB）。
 
-### 最小体积构建（min profile）
+### dnn 层裁剪
 
-`dist/wq.min.*` 是用同一份源码、换成"体积优先"的编译/链接参数产出的，API 和准确率与标准版完全一致，单帧耗时约 +45%：
+`modules/dnn/src/init.cpp` 用 `CV_DNN_REGISTER_LAYER_CLASS(...)` 把 200 多个层实现注册进 `LayerFactory`。`LayerFactory` 里存的是函数指针，链接器无法证明"没人调用"，所以哪怕开了 `-Wl,--gc-sections`，每个层的 `.cpp.o` 都会被保留——实测 7.80 MB 的 wasm 里 `dnn` 占 6.2 MB，而 `wechat_qrcode` 只用得到 14 种层（`Conv2/ReLU/BatchNorm2/NaryEltwise/Pad2/Reshape2/Transpose/Concat2/MaxPool/ConvTranspose2/Slice2/Softmax/PriorBox/DetectionOutput`）。
 
-```powershell
-.\scripts\build-opencv.ps1 -MinSize   # 配置到 build/opencv-wasm-min，-Os + 符号分段
-.\scripts\build-wasm.ps1 -MinSize     # 产物 dist/wq.min.js + dist/wq.min.wasm
-# 或：npm run build:min
-```
+`scripts/build-opencv.ps1` 默认先调用 [tools/trim_dnn_registry.py](../tools/trim_dnn_registry.py) 把不用的注册行注释成 `// [trim-dnn-registry] ...`，再编译。少了这些函数指针引用，静态库里的层 `.o` 会在链接时被整个跳过：
 
-| 环节 | 标准版 | 最小体积版 | 作用 |
-| --- | --- | --- | --- |
-| OpenCV 编译 | `-O2` | `-Os -DNDEBUG -ffunction-sections -fdata-sections` | 每个函数/数据单独成段，给下一步的裁剪提供粒度 |
-| wasm 链接 | `-O3` | `-Oz` + `-Wl,--gc-sections` | 丢掉扫码路径调用不到的 OpenCV dnn 层/工具函数（最大的一笔收益） |
-| 内存分配器 | 默认 dlmalloc | `-sMALLOC=emmalloc` | 更小的分配器实现 |
-| JS 胶水 | 原样 | `--closure 1` | `wq.js` 71 KB → 35 KB（gzip 19 KB → 13 KB） |
+| 构建 | wasm | gzip | 单帧耗时 | 说明 |
+| --- | --- | --- | --- | --- |
+| `-FullDnn`（未裁剪） | 7,803,995 B | 1,714,194 B | ~71 ms | 支持任意 OpenCV dnn 能导入的 ONNX 模型 |
+| 默认（裁剪） | 4,373,639 B | 1,019,853 B | ~70 ms | 只含上面 14 种层，速度不变 |
 
-实测（24 核机器，同一台）：`wq.wasm` 7,803,995 → 5,942,478 字节（−24%），gzip 1,714,194 → 1,358,945（−21%）；29 张测试集准确率不变（默认 27/29，`tiles: 2` 时 28/29）。不要手工在 Emscripten 产物上再跑 `wasm-opt`：需要精确的 feature 集合（bulk-memory、exception-handling 等），猜错会生成 ID 非法的模块、浏览器直接 `CompileError`；`-Oz` 已经让 Emscripten 用正确的参数调过 binaryen 了。
+> 也评估过 `-Os` 构建（`-Os -ffunction-sections -fdata-sections` + `--gc-sections` + `emmalloc` + `--closure 1` + `-Oz`）：只能把裁剪后的 4.17 MB 再压到 3.29 MB（gzip 0.97 → 0.77 MB），但单帧从 ~70 ms 涨到 ~101 ms（+45%）。扫码是实时交互场景，这个交换不划算，因此仓库只发布性能优先的一套构建。
 
-注意：最小版把 OpenCV 编译到单独的 `build/opencv-wasm-min/`，不会覆盖标准版的 `build/opencv-wasm/`，两套产物可以并存。
+裁剪是**幂等**的：重复执行不会再次改动文件；对 OpenCV checkout 留下的改动可以用 `python tools/trim_dnn_registry.py --opencv <path> --revert` 还原（或 `git -C <path> checkout -- modules/dnn/src/init.cpp`）。
+
+换模型时如果报 `Layer "Xxx" not found in LayerFactory`，把 `Xxx` 加进脚本顶部的 `KEEP` 集合，重跑 `build-opencv.ps1`（只会重编 `init.cpp` 并重链 `libopencv_dnn.a`，几十秒）。想从零生成 `KEEP`：给 `LayerFactory::createLayerInstance` 临时加一行 `fprintf(stderr, "[WQTRACE-LAYER] %s\n", type.c_str())`，用测试语料跑一遍，收集去重后的层名即可（本次的 14 种就是这样得到的）。
 
 ## 常见坑
 
@@ -133,4 +129,4 @@ node tests/benchmark.mjs  # 与 zxing-wasm / jsQR 对比
 npm run test:browser      # 真实 Chrome 自动化（puppeteer-core）
 ```
 
-测试图会写到 `tests/assets/`（png + 原始 RGBA + `manifest.json`），体积约 94 MB，已被 `.gitignore` 忽略；`manifest.json` 里带每张图的 payload 和标签，`tests/_harness.mjs` 负责加载。跑最小体积版用 `node tests/run-tests.mjs --variant min`（或 `npm run test:min`）。
+测试图会写到 `tests/assets/`（png + 原始 RGBA + `manifest.json`），体积约 94 MB，已被 `.gitignore` 忽略；`manifest.json` 里带每张图的 payload 和标签，`tests/_harness.mjs` 负责加载。

@@ -1,6 +1,6 @@
 {
   "name": "wechat-qrcode-wasm",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "OpenCV 5.x wechat_qrcode (SSD detector + super-resolution + zxing decoder) compiled to WebAssembly for browser QR scanning.",
@@ -15,8 +15,7 @@
   },
   "exports": {
     ".": "./web/scanner.js",
-    "./wasm": "./dist/wq.js",
-    "./wasm-min": "./dist/wq.min.js"
+    "./wasm": "./dist/wq.js"
   },
   "files": [
     "dist/",
@@ -28,15 +27,13 @@
   "scripts": {
     "build:opencv": "pwsh -File scripts/build-opencv.ps1",
     "build:wasm": "pwsh -File scripts/build-wasm.ps1",
-    "build:min": "pwsh -File scripts/build-opencv.ps1 -MinSize && pwsh -File scripts/build-wasm.ps1 -MinSize",
     "build": "node scripts/build-all.mjs",
     "serve": "node scripts/serve.mjs",
     "assets": "python tools/gen_test_assets.py",
     "fetch:models": "python tools/fetch_models.py",
     "patch:sr": "python tools/patch_sr_model.py",
     "test": "node tests/run-tests.mjs",
-    "test:min": "node tests/run-tests.mjs --variant min",
-    "bench": "node tests/benchmark.mjs --tiles 2 --min --md BENCHMARK.md",
+    "bench": "node tests/benchmark.mjs --tiles 2 --md BENCHMARK.md",
     "test:browser": "node tests/browser/run-browser-test.mjs"
   },
   "keywords": [
