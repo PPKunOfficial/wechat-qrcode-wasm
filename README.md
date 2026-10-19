@@ -1,6 +1,7 @@
 # wechat_qrcode · WebAssembly
 
 [![CI](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/PPKunOfficial/wechat-qrcode-wasm)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![wasm: 7.4 MB](https://img.shields.io/badge/wasm-7.4%20MB%20%C2%B7%201.6%20MB%20gzip-654ff0)](dist/wq.wasm)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](package.json)
@@ -47,6 +48,8 @@ npm run serve        # http://127.0.0.1:5173/demo/
 打开 <http://127.0.0.1:5173/demo/> 点「启动相机」，或「上传图片」传一张二维码照片。摄像头需要 HTTPS 或 localhost。
 
 `dist/` 里已带好构建产物（`wq.js` / `wq.wasm`），克隆即可用；重新构建见 [docs/build.md](docs/build.md)。
+
+不想拉整个仓库：到 [Releases](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases) 下载 `wq.wasm` + `wq.js`，模型文件在仓库的 `models/` 下（`detect.onnx` / `sr.onnx`，共约 1 MB）。
 
 ### 作为库使用
 
