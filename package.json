@@ -1,0 +1,48 @@
+{
+  "name": "wechat-qrcode-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenCV 5.x wechat_qrcode (SSD detector + super-resolution + zxing decoder) compiled to WebAssembly for browser QR scanning.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./web/scanner.js",
+    "./wasm": "./dist/wq.js"
+  },
+  "files": [
+    "dist/",
+    "web/",
+    "models/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build:opencv": "pwsh -File scripts/build-opencv.ps1",
+    "build:wasm": "pwsh -File scripts/build-wasm.ps1",
+    "build": "node scripts/build-all.mjs",
+    "serve": "node scripts/serve.mjs",
+    "assets": "python tools/gen_test_assets.py",
+    "fetch:models": "python tools/fetch_models.py",
+    "patch:sr": "python tools/patch_sr_model.py",
+    "test": "node tests/run-tests.mjs",
+    "bench": "node tests/benchmark.mjs",
+    "test:browser": "node tests/browser/run-browser-test.mjs"
+  },
+  "keywords": [
+    "qrcode",
+    "qr",
+    "opencv",
+    "wechat",
+    "wasm",
+    "webassembly",
+    "scanner"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "jsqr": "^1.4.0",
+    "puppeteer-core": "^25.14.0",
+    "zxing-wasm": "^3.1.5"
+  }
+}

@@ -1,0 +1,16 @@
+# build artifacts / caches
+/build/
+/.cache/
+/emsdk/
+
+# generated test corpus (regenerate with: npm run assets)
+/tests/assets/
+
+# python
+__pycache__/
+*.pyc
+# node
+node_modules/
+# os
+Thumbs.db
+.DS_Store

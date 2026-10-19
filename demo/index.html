@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>WeChat QRCode · WebAssembly 扫码演示</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>WeChat QRCode <span class="tag">WASM</span></h1>
+            <p class="subtitle">OpenCV 5.x wechat_qrcode · 神经网络检测 + 超分辨率 + zxing 多二值化解码</p>
+          </div>
+        </div>
+        <div class="status" id="status" data-state="loading">
+          <span class="dot"></span><span id="status-text">加载 WASM 模块…</span>
+        </div>
+      </header>
+
+      <section class="stage">
+        <div class="viewport" id="viewport">
+          <video id="video" playsinline muted autoplay></video>
+          <img id="snapshot" alt="" hidden />
+          <canvas id="overlay"></canvas>
+          <div class="viewport-empty" id="viewport-empty">
+            <p>点击 <strong>启动相机</strong>，或上传一张二维码图片</p>
+            <p class="hint">摄像头需要 HTTPS 或 localhost</p>
+          </div>
+          <div class="fps-badge" id="fps-badge" hidden>— fps</div>
+        </div>
+
+        <div class="panel">
+          <div class="controls">
+            <button class="btn primary" id="btn-camera">启动相机</button>
+            <button class="btn" id="btn-torch" disabled>补光灯</button>
+            <label class="btn file">
+              上传图片
+              <input type="file" id="file-input" accept="image/*" hidden />
+            </label>
+          </div>
+
+          <div class="slider">
+            <div class="slider-head">
+              <span>检测缩放 <code id="scale-value">auto</code></span>
+              <label class="check"><input type="checkbox" id="auto-scale" checked /> 自动</label>
+            </div>
+            <input type="range" id="scale" min="0.2" max="1" step="0.05" value="1" disabled />
+            <span class="hint">自动 = 模块默认（缩到约 400×400 再检测，微信同款）；关掉后可手动固定缩放比例，越小越快</span>
+          </div>
+
+          <dl class="stats">
+            <div><dt>帧耗时</dt><dd id="stat-latency">—</dd></div>
+            <div><dt>帧率</dt><dd id="stat-fps">—</dd></div>
+            <div><dt>已识别</dt><dd id="stat-count">0</dd></div>
+            <div><dt>模型</dt><dd id="stat-models">—</dd></div>
+          </dl>
+
+          <div class="results">
+            <div class="results-head">
+              <h2>识别记录</h2>
+              <button class="btn ghost small" id="btn-clear">清空</button>
+            </div>
+            <ol id="result-list" class="result-list"></ol>
+            <p class="empty" id="result-empty">还没有识别结果</p>
+          </div>
+
+          <footer class="meta" id="meta"></footer>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./demo.js"></script>
+  </body>
+</html>

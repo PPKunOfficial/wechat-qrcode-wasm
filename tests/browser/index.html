@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>wechat_qrcode wasm · browser tests</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        padding: 24px 28px 64px;
+        background: #0b1020;
+        color: #e8eefc;
+        font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .sub { color: #8fa0c0; margin-bottom: 18px; }
+      #status { margin: 14px 0 18px; padding: 10px 14px; border-radius: 10px; background: #141c33; border: 1px solid #22304f; }
+      #status.ok { border-color: #1f6f4a; }
+      #status.err { border-color: #7a2b3a; }
+      table { border-collapse: collapse; width: 100%; max-width: 1000px; }
+      th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid #1b2440; font-variant-numeric: tabular-nums; }
+      th { color: #93a4c4; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+      td.pass { color: #5fd39b; }
+      td.fail { color: #ff7b8a; }
+      .summary { margin-top: 18px; font-size: 15px; }
+      .payload { color: #8fa0c0; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>wechat_qrcode wasm · browser verification</h1>
+    <div class="sub">
+      Same corpus as the node benchmark, decoded through <code>web/scanner.js</code> in this browser tab
+      (detect.onnx + sr.onnx + ONNX runtime-free OpenCV dnn, no native code).
+    </div>
+    <div id="status">loading wasm module…</div>
+    <table>
+      <thead>
+        <tr>
+          <th>asset</th>
+          <th>tags</th>
+          <th>size</th>
+          <th>scan</th>
+          <th>payload</th>
+          <th>time</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="summary" id="summary"></div>
+    <script type="module" src="./browser-test.js"></script>
+  </body>
+</html>
