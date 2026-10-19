@@ -1,14 +1,20 @@
 # Links src/wq_wasm.cpp against the OpenCV wasm static libraries and produces
 #   dist/wq.js   (ES module factory, MODULARIZE + EXPORT_ES6)
 #   dist/wq.wasm
+# With -MinSize it instead links the build/opencv-wasm-min libraries (-Os objects,
+# one section per symbol + --gc-sections, emmalloc, closure-minified JS, wasm-opt -Oz)
+# and writes dist/wq.min.js + dist/wq.min.wasm.
 #
-# Requires build/opencv-wasm/install (run scripts/build-opencv.ps1 first).
+# Requires build/opencv-wasm/install (run scripts/build-opencv.ps1 first; -MinSize needs
+# `scripts/build-opencv.ps1 -MinSize`).
 param(
     [string]$OpenCvBuild,
     [string]$OutDir,
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'Release', 'MinSize')]
     [string]$Mode = 'Release',
-    [string]$Optimization = '-O3'
+    # Minimal-size variant: same API/behaviour, smaller wasm at the cost of some speed.
+    [switch]$MinSize,
+    [string]$Optimization
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,8 +24,17 @@ $ErrorActionPreference = 'Stop'
 $paramOpenCvBuild = $OpenCvBuild
 $paramOutDir = $OutDir
 . "$PSScriptRoot\_env.ps1"
-if ($paramOpenCvBuild) { $OpenCvBuild = $paramOpenCvBuild } else { $OpenCvBuild = $script:OpenCvBuild }
+if ($MinSize) { $Mode = 'MinSize' }
+if ($paramOpenCvBuild) {
+    $OpenCvBuild = $paramOpenCvBuild
+} elseif ($MinSize) {
+    $OpenCvBuild = Join-Path $script:BuildRoot 'opencv-wasm-min'
+} else {
+    $OpenCvBuild = $script:OpenCvBuild
+}
 if ($paramOutDir) { $OutDir = $paramOutDir } else { $OutDir = $script:DistDir }
+if (-not $Optimization) { $Optimization = if ($MinSize) { '-Os' } else { '-O3' } }
+$baseName = if ($MinSize) { 'wq.min' } else { 'wq' }
 
 $installDir = Join-Path $OpenCvBuild 'install'
 $libDir = Join-Path $installDir 'lib'
@@ -95,11 +110,17 @@ $flags = @(
 if ($Mode -eq 'Debug') {
     $flags += @('-sASSERTIONS=1', '-g', '-sSAFE_HEAP=1')
 }
+if ($Mode -eq 'MinSize') {
+    # --gc-sections only pays off because the OpenCV libs were compiled with
+    # -ffunction-sections/-fdata-sections (scripts/configure-opencv.ps1 -MinSize).
+    $flags += @('-Wl,--gc-sections', '-sMALLOC=emmalloc', '--closure', '1')
+}
 
 $src = Join-Path $RepoRoot 'src\wq_wasm.cpp'
 if (-not (Test-Path $src)) { throw "missing wrapper source: $src" }
 
-$outFile = Join-Path $OutDir 'wq.js'
+$outFile = Join-Path $OutDir "$baseName.js"
+$wasmFile = Join-Path $OutDir "$baseName.wasm"
 
 Push-Location $RepoRoot
 try {
@@ -109,13 +130,17 @@ try {
     ) + $linkLibs + $thirdPartyLibs + @(
         '-Wl,--end-group'
     ) + $flags + @('-o', $outFile)
-    Write-Host "Linking wasm module"
+    Write-Host "Linking wasm module ($Mode)"
     Invoke-Exe $emxx $cmd
 
-    $wasmFile = Join-Path $OutDir 'wq.wasm'
     if (-not (Test-Path $wasmFile)) { throw "expected $wasmFile to be produced" }
+
+    # Note: Emscripten already runs binaryen (wasm-opt) with the right feature flags for
+    # -Oz/-Os; running wasm-opt by hand needs the exact feature set (bulk-memory, EH, ...)
+    # and produces an invalid module when guessed wrong, so we don't post-process here.
+
     Write-Host ("Built {0} ({1:N0} bytes) and {2} ({3:N0} bytes)" -f `
-        'wq.wasm', (Get-Item $wasmFile).Length, 'wq.js', (Get-Item $outFile).Length)
+        (Split-Path $wasmFile -Leaf), (Get-Item $wasmFile).Length, (Split-Path $outFile -Leaf), (Get-Item $outFile).Length)
 } finally {
     Pop-Location
 }

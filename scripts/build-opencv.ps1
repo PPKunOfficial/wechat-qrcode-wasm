@@ -8,6 +8,8 @@ param(
     [int]$Jobs = 0,
     [switch]$SkipConfigure,
     [switch]$Reconfigure,
+    # Build the minimal-size variant (build/opencv-wasm-min by default).
+    [switch]$MinSize,
     [string]$OpenCVSrc = $env:OPENCV_SRC,
     [string]$BuildDir
 )
@@ -19,13 +21,19 @@ $paramOpenCVSrc = $OpenCVSrc
 $paramBuildDir = $BuildDir
 . "$PSScriptRoot\_env.ps1"
 if ($paramOpenCVSrc) { $OpenCVSrc = $paramOpenCVSrc } else { $OpenCVSrc = $script:OpenCvSrc }
-if ($paramBuildDir) { $BuildDir = $paramBuildDir } else { $BuildDir = $script:OpenCvBuild }
+if ($paramBuildDir) {
+    $BuildDir = $paramBuildDir
+} elseif ($MinSize) {
+    $BuildDir = Join-Path $script:BuildRoot 'opencv-wasm-min'
+} else {
+    $BuildDir = $script:OpenCvBuild
+}
 if ($Jobs -le 0) { $Jobs = [Environment]::ProcessorCount }
 
 if (-not $SkipConfigure -or $Reconfigure) {
-    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -Reconfigure:$Reconfigure
+    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -MinSize:$MinSize -Reconfigure:$Reconfigure
 } elseif (-not (Test-Path (Join-Path $BuildDir 'build.ninja'))) {
-    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir
+    & "$PSScriptRoot\configure-opencv.ps1" -OpenCVSrc $OpenCVSrc -BuildDir $BuildDir -MinSize:$MinSize
 }
 
 if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {

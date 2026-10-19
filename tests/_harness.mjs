@@ -25,8 +25,13 @@ export const FORMAT_BGR = 3;
 const quietPrint = () => {};
 const quietPrintErr = () => {};
 
-async function loadModule({ verbose = false } = {}) {
-  const factory = (await import(new URL('../dist/wq.js', import.meta.url).href)).default;
+/** Dist entry file for a build variant: 'default' -> dist/wq.js, 'min' -> dist/wq.min.js. */
+export function moduleEntry(variant = 'default') {
+  return new URL(variant === 'min' ? '../dist/wq.min.js' : '../dist/wq.js', import.meta.url).href;
+}
+
+async function loadModule({ verbose = false, variant = 'default' } = {}) {
+  const factory = (await import(moduleEntry(variant))).default;
   return factory({
     locateFile: (path) => join(distDir, basename(path)),
     print: verbose ? (msg) => console.log('[wasm]', msg) : quietPrint,
@@ -46,8 +51,8 @@ function writeModels(module) {
 }
 
 /** Loads the module and initializes wq_init() directly through the C API. */
-export async function loadScanner({ verbose = false } = {}) {
-  const module = await loadModule({ verbose });
+export async function loadScanner({ verbose = false, variant = 'default' } = {}) {
+  const module = await loadModule({ verbose, variant });
   writeModels(module);
   const rc = withCString(module, '/models/detect.onnx', (detectPtr) =>
     withCString(module, '/models/sr.onnx', (srPtr) => module._wq_init(detectPtr, srPtr)),
@@ -62,9 +67,9 @@ export async function loadScanner({ verbose = false } = {}) {
  * Loads the production wrapper (web/scanner.js) on top of the same wasm build.
  * Used by the test runner/benchmark so the shipped JS path is exercised too.
  */
-export async function loadWrapper({ verbose = false } = {}) {
+export async function loadWrapper({ verbose = false, variant = 'default' } = {}) {
   const { createScanner } = await import(new URL('../web/scanner.js', import.meta.url).href);
-  const moduleFactory = (await import(new URL('../dist/wq.js', import.meta.url).href)).default;
+  const moduleFactory = (await import(moduleEntry(variant))).default;
   return createScanner({
     detectModel: new Uint8Array(readFileSync(join(modelsDir, 'detect.onnx'))),
     srModel: new Uint8Array(readFileSync(join(modelsDir, 'sr.onnx'))),

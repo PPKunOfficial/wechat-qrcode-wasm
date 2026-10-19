@@ -353,10 +353,14 @@ async function boot() {
   els.scale.addEventListener('input', updateScaleLabel);
   els.autoScale.addEventListener('change', updateScaleLabel);
 
+  // ?variant=min loads the minimal-size release build (dist/wq.min.js) instead of dist/wq.js.
+  const variant = new URLSearchParams(location.search).get('variant') === 'min' ? 'min' : 'default';
   setStatus('下载模型…', 'loading');
   try {
+    const moduleFactory = variant === 'min' ? (await import('../dist/wq.min.js')).default : undefined;
     state.scanner = await createScanner({
       ...MODEL_URLS,
+      moduleFactory,
       printErr: (msg) => console.warn('[wasm]', msg),
       // Let the module build a tiny bit faster: no run dependency needed.
     });
@@ -367,7 +371,7 @@ async function boot() {
   }
 
   els.statModels.textContent = `${state.scanner.opencvVersion}`;
-  els.meta.textContent = `OpenCV ${state.scanner.opencvVersion} · detect ${(
+  els.meta.textContent = `OpenCV ${state.scanner.opencvVersion}${variant === 'min' ? ' · min build' : ''} · detect ${(
     state.scanner.modelInfo.detectBytes / 1024
   ).toFixed(0)} KB · sr ${(state.scanner.modelInfo.srBytes / 1024).toFixed(0)} KB`;
   setStatus('就绪', 'ready');

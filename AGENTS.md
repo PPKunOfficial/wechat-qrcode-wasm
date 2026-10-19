@@ -10,15 +10,17 @@
 
 ```bash
 npm install              # 测试/基准依赖
-npm run serve            # http://127.0.0.1:5173/demo/
+npm run serve            # http://127.0.0.1:5173/demo/（加 ?variant=min 用最小体积版）
 npm test                 # Node 冒烟 + 准确率（29 张单码 + 4 张多码场景）
+npm run test:min         # 同一套语料跑 dist/wq.min.js（最小体积版）
 npm run bench            # 对比 zxing-wasm / jsQR，写 BENCHMARK.md
 npm run test:browser     # 真实 Chrome（puppeteer-core）跑 14 张图（含多码）
 npm run assets           # 重新生成测试集（python + segno/pillow/numpy）
 npm run build            # 全量重建（OpenCV 源码在 .cache/opencv 或 $env:OPENCV_SRC）
+npm run build:min        # 重建最小体积版：dist/wq.min.js + dist/wq.min.wasm
 ```
 
-产物：`dist/wq.js` + `dist/wq.wasm`（已提交，可省略构建）。模型在 `models/`。
+产物：标准版 `dist/wq.js` + `dist/wq.wasm`（7.44 MB），最小体积版 `dist/wq.min.js` + `dist/wq.min.wasm`（5.67 MB），都已提交，可省略构建。模型在 `models/`。
 
 ## 硬性约束
 
@@ -27,14 +29,17 @@ npm run build            # 全量重建（OpenCV 源码在 .cache/opencv 或 $en
 - OpenCV 构建必须带 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1`，否则 `wq_init` 在 `CV_Assert(utils::fs::exists())` 抛 `StsNotImplemented`。
 - 改 `BUILD_LIST` / 模块集合后必须用 `configure-opencv.ps1 -Reconfigure`（清 build 目录），否则 CMake cache 里的 `BUILD_opencv_*=OFF` 会让模块静默消失。
 - 不要引入 pthread：单线程是"任意静态托管可用、无需 COOP/COEP"的前提。
-- 不要把 `tests/assets/`（约 95 MB 生成物：PNG + 原始 RGBA）提交进仓库。
+- 不要把 `tests/assets/`（约 94 MB 生成物：PNG + 原始 RGBA）提交进仓库。
+- `dist/wq.min.*` 只能由 `-MinSize` 构建产生（`build/opencv-wasm-min`，OpenCV 编译参数 `-Os -ffunction-sections -fdata-sections`，链接 `-Oz -Wl,--gc-sections -sMALLOC=emmalloc --closure 1`）；不要手工在 wasm 上再跑 `wasm-opt`（feature 集合不对会生成 ID 非法的模块）。
+- 标准版与最小版的 API/准确率必须保持一致；改 `src/wq_wasm.cpp` 或 `web/scanner.js` 后两套产物都要重新构建、重跑测试。
 
 ## 验证要求（改完必须跑）
 
 1. `npm test` → 期望 `decoded 27/29 assets`、`clean reference set: 5/5`、`hard tier: 8/10`（不开切图），且 multi-code 段 4/4 PASS（2 码、3 码、同码重复、3×3 九宫格）。
-2. `node tests/benchmark.mjs --tiles 2` → 期望 wechat_qrcode 28/29，且 BENCHMARK.md 被更新。
+2. `npm run bench`（= `node tests/benchmark.mjs --tiles 2 --min --md BENCHMARK.md`）→ 期望 wechat_qrcode 28/29、min 行 28/29，且 BENCHMARK.md 被更新。
 3. `npm run test:browser` → 期望 `browser: decoded 14/14`，退出码 0。它需要本机 Chrome（puppeteer-core 通过 `CHROME_PATH` 或默认路径找）。
-4. 改了 JNI/wasm 导出 → 先 `npm run build` 再跑上面三项。
+4. `npm run test:min` → 最小体积版同一准确率：`decoded 27/29`、`hard tier: 8/10`（`--tiles 2` 时 28/29 / 9/10，但会更慢）；`node tests/browser/run-browser-test.mjs --variant min` 期望 `14/14`。
+5. 改了 JNI/wasm 导出 → 先 `npm run build`（和/或 `npm run build:min`）再跑上面几项。
 
 已知唯一"该失败"的用例：`hard_text_zh_recompressed`（信息量已被破坏），任何解码器都解不出，别试图调参让它通过。
 

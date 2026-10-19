@@ -9,7 +9,11 @@
 param(
     [string]$OpenCVSrc = $env:OPENCV_SRC,
     [string]$BuildDir,
-    [switch]$Reconfigure
+    [switch]$Reconfigure,
+    # Minimal-size profile (used for the release `wq.min.*` artifact): compile with -Os and
+    # put every function/data in its own section, so the wasm link (-Wl,--gc-sections) can
+    # drop the OpenCV dnn layers and core helpers that the QRCode pipeline never calls.
+    [switch]$MinSize
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,12 +35,23 @@ if ($Reconfigure -and (Test-Path $BuildDir)) {
 }
 New-Item -ItemType Directory -Force $BuildDir | Out-Null
 
+# Release (default): -O2, faster decode. MinSize: -Os + one section per symbol; the linker
+# then garbage-collects unused code, which is where most of the size win comes from.
+if ($MinSize) {
+    $buildType = 'MinSizeRel'
+    $optimizationFlags = '-Os -DNDEBUG -ffunction-sections -fdata-sections'
+} else {
+    $buildType = 'Release'
+    $optimizationFlags = '-O2'
+}
+$cFlags = "$optimizationFlags -DOPENCV_HAVE_FILESYSTEM_SUPPORT=1"
+
 # Keep this list in sync with docs/build.md.
 $cmakeArgs = @(
     '-G', 'Ninja'
     '-S', $OpenCVSrc
     '-B', $BuildDir
-    '-DCMAKE_BUILD_TYPE=Release'
+    '-DCMAKE_BUILD_TYPE=' + $buildType
     '-DCMAKE_POLICY_VERSION_MINIMUM=3.5'
     '-DCMAKE_INSTALL_PREFIX=' + (Join-Path $BuildDir 'install')
     # C++17 is required by OpenCV 5.x; emscripten's default is fine but pin it for clarity.
@@ -118,8 +133,8 @@ $cmakeArgs = @(
     # constructor validates its model paths with utils::fs::exists(), so we opt the POSIX
     # implementation back in: Emscripten's libc exposes stat()/mkdir() over the MEMFS/IDBFS
     # filesystems, which is exactly where our JS glue writes the .onnx models.
-    '-DCMAKE_C_FLAGS=-O2 -DOPENCV_HAVE_FILESYSTEM_SUPPORT=1'
-    '-DCMAKE_CXX_FLAGS=-O2 -DOPENCV_HAVE_FILESYSTEM_SUPPORT=1'
+    '-DCMAKE_C_FLAGS=' + $cFlags
+    '-DCMAKE_CXX_FLAGS=' + $cFlags
     '-DCMAKE_EXE_LINKER_FLAGS='
 )
 

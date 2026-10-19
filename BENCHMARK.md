@@ -7,45 +7,48 @@ All decoders receive identical raw RGBA pixels; latency is measured in node on t
 Multi-code scenes are excluded here (jsQR decodes a single code per call); they are covered by tests/run-tests.mjs.
 
 Decoder configuration: tiled fallback 2x2 for wechat_qrcode.
+The `min build` row is `dist/wq.min.wasm` (`-MinSize`: `-Os` + `-ffunction-sections` + `--gc-sections` +
+`-sMALLOC=emmalloc` + `--closure 1`); identical pipeline and accuracy, only code-size-for-speed trade-off.
 
 | decoder | decoded | clean set | hard tier | avg latency |
 | --- | --- | --- | --- | --- |
-| OpenCV wechat_qrcode (this repo) | 28/29 (97%) | 5/5 | 9/10 | 93.7 ms |
+| OpenCV wechat_qrcode (this repo) | 28/29 (97%) | 5/5 | 9/10 | 94.3 ms |
+| wechat_qrcode, min build (5.67 MB) | 28/29 (97%) | 5/5 | 9/10 | 132.8 ms |
 | zxing-wasm | 25/29 (86%) | 5/5 | 6/10 | 3.9 ms |
-| jsQR | 25/29 (86%) | 5/5 | 6/10 | 84.4 ms |
+| jsQR | 25/29 (86%) | 5/5 | 6/10 | 80.6 ms |
 
 ## Per-asset results
 
-| asset | tags | wechat | zxing-wasm | jsqr |
-| --- | --- | --- | --- | --- |
-| url_clean | clean | ✓ 59 | ✓ 2 | ✓ 10 |
-| text_zh_clean | clean | ✓ 60 | ✓ 3 | ✓ 10 |
-| wifi_clean | clean | ✓ 61 | ✓ 2 | ✓ 7 |
-| vcard_clean | clean | ✓ 61 | ✓ 3 | ✓ 11 |
-| long_clean | clean | ✓ 60 | ✓ 2 | ✓ 16 |
-| url_small | small | ✓ 59 | ✓ 5 | ✓ 18 |
-| text_zh_small | small | ✓ 58 | ✓ 5 | ✓ 34 |
-| wifi_small | small | ✓ 57 | ✓ 5 | ✓ 30 |
-| url_blur_light | blur | ✓ 58 | ✓ 3 | ✓ 7 |
-| url_blur_heavy | blur | ✓ 60 | ✓ 3 | ✓ 9 |
-| text_zh_noise | noise | ✓ 64 | ✓ 3 | ✓ 168 |
-| text_zh_dark | lowlight | ✓ 60 | ✓ 2 | ✓ 7 |
-| wifi_lowcontrast | low_contrast | ✓ 60 | ✓ 2 | ✓ 8 |
-| url_glare | glare | ✓ 59 | ✓ 2 | ✓ 6 |
-| long_perspective | perspective | ✓ 62 | ✓ 3 | ✓ 11 |
-| long_rot45 | rotation | ✓ 64 | ✓ 2 | ✓ 13 |
-| long_rot15 | rotation | ✓ 61 | ✓ 3 | ✓ 12 |
-| vcard_downscale | compression | ✓ 59 | ✓ 3 | ✓ 12 |
-| vcard_blur_small | small, blur | ✓ 60 | ✓ 3 | ✓ 11 |
-| hard_url_far | hard, far | ✓ 289 | ✓ 10 | ✓ 34 |
-| hard_text_zh_far | hard, far | ✓ 59 | ✓ 6 | ✓ 21 |
-| hard_wifi_far | hard, far | ✓ 63 | ✓ 10 | ✓ 37 |
-| hard_url_far_blur | hard, far, blur | ✓ 151 | ✗ | ✗ |
-| hard_text_zh_defocus | hard, blur | ✓ 68 | ✗ | ✗ |
-| hard_long_night | hard, lowlight | ✓ 64 | ✗ | ✗ |
-| hard_vcard_glare | hard, glare | ✓ 59 | ✓ 2 | ✓ 11 |
-| hard_url_tilted | hard, perspective | ✓ 58 | ✓ 3 | ✓ 59 |
-| hard_text_zh_recompressed | hard, compression, noise | ✗ | ✗ | ✗ |
-| hard_wifi_rotated | hard, rotation | ✓ 58 | ✓ 6 | ✓ 68 |
+| asset | tags | wechat | wechat-min | zxing-wasm | jsqr |
+| --- | --- | --- | --- | --- | --- |
+| url_clean | clean | ✓ 59 | ✓ 88 | ✓ 3 | ✓ 10 |
+| text_zh_clean | clean | ✓ 60 | ✓ 90 | ✓ 3 | ✓ 11 |
+| wifi_clean | clean | ✓ 60 | ✓ 89 | ✓ 2 | ✓ 8 |
+| vcard_clean | clean | ✓ 62 | ✓ 91 | ✓ 2 | ✓ 9 |
+| long_clean | clean | ✓ 62 | ✓ 90 | ✓ 2 | ✓ 11 |
+| url_small | small | ✓ 60 | ✓ 88 | ✓ 5 | ✓ 28 |
+| text_zh_small | small | ✓ 60 | ✓ 88 | ✓ 5 | ✓ 21 |
+| wifi_small | small | ✓ 59 | ✓ 88 | ✓ 5 | ✓ 31 |
+| url_blur_light | blur | ✓ 59 | ✓ 88 | ✓ 3 | ✓ 12 |
+| url_blur_heavy | blur | ✓ 59 | ✓ 87 | ✓ 3 | ✓ 7 |
+| text_zh_noise | noise | ✓ 62 | ✓ 92 | ✓ 3 | ✓ 168 |
+| text_zh_dark | lowlight | ✓ 58 | ✓ 88 | ✓ 2 | ✓ 6 |
+| wifi_lowcontrast | low_contrast | ✓ 58 | ✓ 88 | ✓ 2 | ✓ 6 |
+| url_glare | glare | ✓ 58 | ✓ 86 | ✓ 2 | ✓ 8 |
+| long_perspective | perspective | ✓ 62 | ✓ 89 | ✓ 3 | ✓ 11 |
+| long_rot45 | rotation | ✓ 61 | ✓ 89 | ✓ 3 | ✓ 13 |
+| long_rot15 | rotation | ✓ 61 | ✓ 89 | ✓ 3 | ✓ 11 |
+| vcard_downscale | compression | ✓ 60 | ✓ 88 | ✓ 3 | ✓ 11 |
+| vcard_blur_small | small, blur | ✓ 60 | ✓ 89 | ✓ 3 | ✓ 11 |
+| hard_url_far | hard, far | ✓ 285 | ✓ 427 | ✓ 10 | ✓ 33 |
+| hard_text_zh_far | hard, far | ✓ 59 | ✓ 86 | ✓ 6 | ✓ 20 |
+| hard_wifi_far | hard, far | ✓ 63 | ✓ 91 | ✓ 10 | ✓ 38 |
+| hard_url_far_blur | hard, far, blur | ✓ 156 | ✓ 210 | ✗ | ✗ |
+| hard_text_zh_defocus | hard, blur | ✓ 69 | ✓ 95 | ✗ | ✗ |
+| hard_long_night | hard, lowlight | ✓ 66 | ✓ 91 | ✗ | ✗ |
+| hard_vcard_glare | hard, glare | ✓ 64 | ✓ 87 | ✓ 3 | ✓ 11 |
+| hard_url_tilted | hard, perspective | ✓ 61 | ✓ 86 | ✓ 3 | ✓ 27 |
+| hard_text_zh_recompressed | hard, compression, noise | ✗ | ✗ | ✗ | ✗ |
+| hard_wifi_rotated | hard, rotation | ✓ 59 | ✓ 88 | ✓ 6 | ✓ 68 |
 
 `✓` = payload decoded, number = milliseconds. `✗` = payload not decoded.

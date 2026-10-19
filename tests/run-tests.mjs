@@ -7,7 +7,7 @@
  * the browser does.
  *
  * Usage:
- *   node tests/run-tests.mjs [--verbose] [--filter clean] [--tiles 2]
+ *   node tests/run-tests.mjs [--verbose] [--filter clean] [--tiles 2] [--variant min]
  *
  * Exit code is non-zero when an asset tagged "clean" fails to decode.
  */
@@ -33,6 +33,8 @@ const flag = (name, fallback = null) => {
 };
 const filter = flag('--filter');
 const tiles = Number(flag('--tiles', '0'));
+// 'min' runs the same corpus against dist/wq.min.js (the minimal-size release build).
+const variant = flag('--variant', 'default');
 
 const pad = (s, n) => String(s).padEnd(n);
 
@@ -41,8 +43,10 @@ async function main() {
   const assets = all.filter((a) => !a.tags.includes('multi'));
   const multiAssets = all.filter((a) => a.tags.includes('multi'));
 
-  const scanner = await loadWrapper({ verbose });
-  console.log(`OpenCV ${scanner.opencvVersion} | wasm module + models loaded in ${fmtMs(scanner.loadMs)}`);
+  const scanner = await loadWrapper({ verbose, variant });
+  console.log(
+    `OpenCV ${scanner.opencvVersion} | ${variant} module + models loaded in ${fmtMs(scanner.loadMs)}`,
+  );
   console.log(
     `detect.onnx ${scanner.formatBytes(scanner.modelInfo.detectBytes)} | ` +
       `sr.onnx ${scanner.formatBytes(scanner.modelInfo.srBytes)}` +

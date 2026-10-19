@@ -7,6 +7,7 @@
  *
  * Usage:
  *   node tests/browser/run-browser-test.mjs [--browser <path>] [--url http://127.0.0.1:5173]
+ *                                           [--variant min]
  *                                           [--screenshot build/browser-tests.png]
  *
  * Exits non-zero when any asset fails to decode in the browser.
@@ -34,8 +35,13 @@ const browserPath =
     ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
     : '/usr/bin/google-chrome');
 const port = Number(flag('--port', '5199'));
-const url = flag('--url', `http://127.0.0.1:${port}/tests/browser/`);
-const screenshot = flag('--screenshot', join(repoRoot, 'build', 'browser-tests.png'));
+const variant = flag('--variant', process.env.WQ_VARIANT || 'default');
+const pageQuery = variant === 'min' ? '?variant=min' : '';
+const url = flag('--url', `http://127.0.0.1:${port}/tests/browser/${pageQuery}`);
+const screenshot = flag(
+  '--screenshot',
+  join(repoRoot, 'build', variant === 'min' ? 'browser-tests-min.png' : 'browser-tests.png'),
+);
 
 const serverScript = join(repoRoot, 'scripts', 'serve.mjs');
 
@@ -88,7 +94,7 @@ async function main() {
       console.log(`${row.ok ? 'PASS' : 'FAIL'} ${row.id.padEnd(28)} ${Math.round(row.ms)} ms`);
     }
     console.log('');
-    console.log(`browser: decoded ${report.pass}/${report.total}`);
+    console.log(`browser: decoded ${report.pass}/${report.total} (${variant} build)`);
 
     if (screenshot) {
       await mkdir(dirname(screenshot), { recursive: true });
