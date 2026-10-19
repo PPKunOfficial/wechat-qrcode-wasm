@@ -30,7 +30,9 @@ const flag = (name, fallback = null) => {
 const browserPath =
   flag('--browser') ||
   process.env.CHROME_PATH ||
-  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  (process.platform === 'win32'
+    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    : '/usr/bin/google-chrome');
 const port = Number(flag('--port', '5199'));
 const url = flag('--url', `http://127.0.0.1:${port}/tests/browser/`);
 const screenshot = flag('--screenshot', join(repoRoot, 'build', 'browser-tests.png'));

@@ -5,6 +5,14 @@
   "type": "module",
   "description": "OpenCV 5.x wechat_qrcode (SSD detector + super-resolution + zxing decoder) compiled to WebAssembly for browser QR scanning.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PPKunOfficial/wechat-qrcode-wasm.git"
+  },
+  "homepage": "https://github.com/PPKunOfficial/wechat-qrcode-wasm#readme",
+  "bugs": {
+    "url": "https://github.com/PPKunOfficial/wechat-qrcode-wasm/issues"
+  },
   "exports": {
     ".": "./web/scanner.js",
     "./wasm": "./dist/wq.js"

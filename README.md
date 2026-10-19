@@ -1,5 +1,10 @@
 # wechat_qrcode · WebAssembly
 
+[![CI](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![wasm: 7.4 MB](https://img.shields.io/badge/wasm-7.4%20MB%20%C2%B7%201.6%20MB%20gzip-654ff0)](dist/wq.wasm)
+[![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](package.json)
+
 把 **OpenCV 5.x 的 `wechat_qrcode` 模块**（微信扫码同款算法：SSD 神经网络检测 + 超分辨率 + zxing 多二值化解码）完整编译成 WebAssembly，供前端在浏览器 / Web Worker / Node 中调用。没有原生插件、没有 ONNX Runtime：推理跑在 OpenCV 自己的 `dnn` 模块里，纯 WASM。
 
 - 上游代码路径保持原样（`third_party/opencv_modules/wechat_qrcode` 是从 opencv_contrib 5.x 迁入的副本，只改 CMakeLists 与一个模型补丁，见 [与上游的差异](#与上游的差异)）。
@@ -75,12 +80,15 @@ web/scanner.js                  ESM 封装（模型注入 MEMFS、扫描、切�
 dist/wq.js, dist/wq.wasm        预编译产物
 models/detect.onnx              官方检测模型（未修改）
 models/sr.onnx                  官方超分模型（修正了动态尺寸裁剪，见 tools/patch_sr_model.py）
-third_party/opencv_modules/     从 opencv_contrib 5.x 迁入的 wechat_qrcode 源码
+third_party/opencv_modules/     从 opencv_contrib 5.x 迁入的 wechat_qrcode 源码（改动见同目录 UPSTREAM.md）
 scripts/                        取源码 / 配置 / 编译 OpenCV 与 wasm / 静态服务器
 demo/                           摄像头扫码 demo
 tests/                          Node 测试、基准、浏览器自动化验证、生成的测试图
 tools/                          模型下载、SR 模型修补、测试集生成
 docs/                           构建、架构、API 文档
+.github/workflows/ci.yml        CI：生成测试集 → 准确率 → 基准 → 真实 Chrome 验证
+NOTICE / THIRD_PARTY_NOTICES    归属声明与第三方许可
+CONTRIBUTING.md                 贡献指南
 ```
 
 ## 自己构建
@@ -103,7 +111,7 @@ docs/                           构建、架构、API 文档
 
 ## 与上游的差异
 
-1. **CMakeLists**：去掉未使用的 `opencv_objdetect` 依赖和 `WRAP java objc python js`，去掉 5.x 里已经失效的 caffe 模型下载块（5.x 只读 ONNX）。
+1. **CMakeLists**：去掉未使用的 `opencv_objdetect` 依赖和 `WRAP java objc python js`，去掉 5.x 里已经失效的 caffe 模型下载块（5.x 只读 ONNX）。逐条记录见 [third_party/opencv_modules/wechat_qrcode/UPSTREAM.md](third_party/opencv_modules/wechat_qrcode/UPSTREAM.md)。
 2. **`models/sr.onnx` 打了动态尺寸补丁**：原模型把 Caffe `Crop` 层固化成 `Slice(ends=[447,447])`，只在 224×224 输入时成立；本模块会喂任意大小的二维码裁剪图。补丁把 `ends` 改成 `[-1,-1]`、输入输出维度改成符号维度（`tools/patch_sr_model.py`，可重复生成）。`models/detect.onnx` 未修改——OpenCV 5.x 的 `Reshape2` 已有旧模型兼容逻辑，能跑动态尺寸。
 3. **OpenCV 以 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1` 编译**：Emscripten 下 OpenCV 默认关闭文件系统，而 `WeChatQRCode` 构造函数会 `CV_Assert(utils::fs::exists(model_path))`。打开后模型通过 Emscripten MEMFS 按路径加载。
 4. **JS 侧切图兜底**：检测网络总是把整帧缩放到 ~400×400，大图里的小码会小到检测不到；`scanner.scan(..., { tiles: 2 })` 用重叠切图恢复小码的相对尺寸。这是对上游能力的补充，默认关闭，不影响原算法路径。
@@ -117,6 +125,19 @@ docs/                           构建、架构、API 文档
 - 5.x 分支是开发版（`OpenCV 5.1.0-dev`）；上游若改动了 ONNX 导入器行为需重新验证。
 - 极低信息量的图（如二次压缩 + 强噪声）任何解码器都无解，属正常。
 
-## 许可
+## 许可与归属
 
-Apache-2.0（同 OpenCV / opencv_contrib）。`third_party/opencv_modules/wechat_qrcode` 来自 opencv_contrib，`models/` 下的模型来自 OpenCV 测试模型仓库，见 [models/LICENSE](models/LICENSE) 与 [third_party/opencv_modules/wechat_qrcode/LICENSE](third_party/opencv_modules/wechat_qrcode/LICENSE)。
+本仓库原创部分（C API、JS 封装、构建脚本、测试、文档）以 **Apache License 2.0** 发布，见 [LICENSE](LICENSE)。随仓库分发的第三方组件与模型沿用其原有许可：
+
+| 组件 | 许可 |
+| --- | --- |
+| OpenCV 5.x（`core/imgproc/flann/geometry/dnn`，静态链接进 `dist/wq.wasm`） | Apache-2.0 |
+| opencv_contrib `wechat_qrcode` 模块（含 ZXing C++ 移植） | Apache-2.0，`Copyright (C) 2021 THL A29 Limited, a Tencent company` |
+| `models/detect.onnx` / `models/sr.onnx`（微信二维码检测与超分模型） | Apache-2.0（Tencent，见 [models/LICENSE](models/LICENSE)） |
+| Protocol Buffers 3.19.1 / zlib 1.3.2 / HarfBuzz 14.2（wasm 内静态链接） | BSD-3-Clause / zlib / Old MIT |
+
+完整的版权声明、修改说明与各许可全文见 [NOTICE](NOTICE) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)；模块原始许可保留在 [third_party/opencv_modules/wechat_qrcode/LICENSE](third_party/opencv_modules/wechat_qrcode/LICENSE)。
+
+本仓库对上游文件的修改（CMakeLists、`models/sr.onnx` 补丁）已按 Apache-2.0 §4(b) 在上表与 `UPSTREAM.md` 中标注。
+
+> **商标声明**：WeChat / 微信是腾讯的商标。本项目是独立的社区移植，与腾讯、OpenCV、ZXing 作者无隶属关系，也未获其背书；名称仅用于说明算法与模型来源。

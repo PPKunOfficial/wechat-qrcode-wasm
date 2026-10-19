@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Accuracy + benchmark (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          npm ci
+          pip install --disable-pip-version-check segno pillow numpy
+
+      - name: Generate test corpus
+        run: npm run assets
+
+      - name: Node accuracy tests (29 single-code + 4 multi-code)
+        run: npm test
+
+      - name: Benchmark vs zxing-wasm / jsQR
+        run: node tests/benchmark.mjs --tiles 2
+
+      - name: Real-browser verification (headless Chrome)
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: npm run test:browser
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: build/browser-tests.png
+          if-no-files-found: ignore

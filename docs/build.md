@@ -17,10 +17,10 @@
 脚本用 PowerShell 7（`pwsh`）编写，路径都用 Windows 形式。`scripts/_env.ps1` 是公共环境：定位 `emcc.exe`、生成 `.emscripten` 配置、把 emsdk 的 `upstream/emscripten`、`upstream/bin`、node、python 放到 `PATH` 最前。
 
 ```powershell
-# emsdk 位置不是默认值时
-$env:EMSDK_DIR = 'D:\projects\emsdk'
-# OpenCV 源码已有 checkout 时
-$env:OPENCV_SRC = 'D:\projects\ocv'
+# emsdk 不在仓库同级的 ../emsdk 时，显式指定
+$env:EMSDK_DIR = 'C:\dev\emsdk'
+# OpenCV 源码已有 checkout 时（否则 fetch-opencv.ps1 会 clone 到 .cache/opencv）
+$env:OPENCV_SRC = 'C:\dev\opencv'
 ```
 
 ## 步骤

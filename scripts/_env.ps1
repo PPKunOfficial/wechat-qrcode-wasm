@@ -16,7 +16,16 @@ $ErrorActionPreference = 'Stop'
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 if (-not $env:EMSDK_DIR) {
-    $env:EMSDK_DIR = 'D:\projects\emsdk'
+    if ($env:EMSDK) {
+        # `emsdk activate` exports EMSDK; reuse it when present.
+        $env:EMSDK_DIR = $env:EMSDK
+    } else {
+        # Default: a sibling `emsdk` checkout next to this repository.
+        $env:EMSDK_DIR = Join-Path (Split-Path $script:RepoRoot -Parent) 'emsdk'
+    }
+}
+if (-not (Test-Path $env:EMSDK_DIR)) {
+    throw "Emscripten SDK not found at '$env:EMSDK_DIR'. Install emsdk and/or set EMSDK_DIR (see docs/build.md)."
 }
 $script:EmsdkRoot = (Resolve-Path $env:EMSDK_DIR).Path
 

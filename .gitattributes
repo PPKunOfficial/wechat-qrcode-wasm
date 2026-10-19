@@ -1,0 +1,15 @@
+# Normalize line endings for contributors on all platforms.
+* text=auto eol=lf
+
+# Windows build scripts stay CRLF-compatible.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary artifacts / assets.
+*.wasm binary
+*.onnx binary
+*.png binary
+*.jpg binary
+*.rgba binary
+*.a binary
+*.zip binary

@@ -1,0 +1,50 @@
+# wechat-qrcode-wasm
+
+Copyright 2026 PPKunOfficial and contributors.
+
+This product bundles software developed by third parties. The original copyright
+notices and license texts are reproduced in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and in the directories listed below.
+
+## OpenCV
+
+OpenCV 5.x (modules core, imgproc, flann, geometry, dnn) — Apache License 2.0.
+<https://github.com/opencv/opencv>
+
+## WeChat QRCode (opencv_contrib)
+
+The `wechat_qrcode` module, including its vendored ZXing decoder port, is:
+
+    Tencent is pleased to support the open source community by making WeChat QRCode available.
+    Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+
+Licensed under the Apache License 2.0. The full text is at
+`third_party/opencv_modules/wechat_qrcode/LICENSE`; the same license file is shipped
+with the models at `models/LICENSE`.
+
+The ZXing C++ port bundled in that module carries the additional attribution:
+
+    zxing — Copyright (c) zxing authors and contributors
+    Please note this software may have been modified by Tencent.
+
+## Machine-learning models
+
+`models/detect.onnx` and `models/sr.onnx` are the WeChat QRCode detection and
+super-resolution models published by the WeChat team through OpenCV. They are
+distributed under the same Apache License 2.0 (see `models/LICENSE`).
+`models/sr.onnx` has been patched by this project for dynamic input sizes; the
+unmodified original is kept at `models/upstream/sr.onnx`.
+
+## Other bundled components
+
+- Protocol Buffers 3.19.1 (ONNX graph parsing) — BSD 3-Clause, Copyright 2008 Google Inc.
+- zlib 1.3.2 — zlib license, Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+- HarfBuzz 14.2 (pulled in by the OpenCV dependency chain) — "Old MIT" license
+- Emscripten runtime (musl libc, compiler-rt) embedded in `dist/wq.js` — MIT / Apache-2.0 with LLVM exception
+
+## Trademarks
+
+"WeChat" and "微信" are trademarks of Tencent. This project is an independent
+community port and is **not** affiliated with, endorsed by, or sponsored by
+Tencent, OpenCV, or the ZXing authors. The names are used only to describe the
+origin of the algorithm and models.
