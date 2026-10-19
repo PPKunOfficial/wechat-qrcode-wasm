@@ -109,3 +109,23 @@ export function filterAssets(assets, filter) {
   if (!hit.length) throw new Error(`no assets match filter ${JSON.stringify(filter)}`);
   return hit;
 }
+
+/** Ground-truth payloads of an asset: multi-code scenes list several, single-code assets one. */
+export function assetPayloads(asset) {
+  return asset.payloads ?? [asset.payload];
+}
+
+/**
+ * True when every expected payload was decoded, counting duplicates (a scene with the same
+ * payload twice must produce two results, since upstream dedupe is spatial, not by text).
+ */
+export function resultsMatchAsset(results, asset) {
+  const want = new Map();
+  for (const payload of assetPayloads(asset)) want.set(payload, (want.get(payload) ?? 0) + 1);
+  const got = new Map();
+  for (const result of results) got.set(result.text, (got.get(result.text) ?? 0) + 1);
+  for (const [payload, count] of want) {
+    if ((got.get(payload) ?? 0) < count) return false;
+  }
+  return true;
+}

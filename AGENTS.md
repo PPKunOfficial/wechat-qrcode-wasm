@@ -11,9 +11,9 @@
 ```bash
 npm install              # 测试/基准依赖
 npm run serve            # http://127.0.0.1:5173/demo/
-npm test                 # Node 冒烟 + 准确率（29 张图）
+npm test                 # Node 冒烟 + 准确率（29 张单码 + 4 张多码场景）
 npm run bench            # 对比 zxing-wasm / jsQR，写 BENCHMARK.md
-npm run test:browser     # 真实 Chrome（puppeteer-core）跑 12 张图
+npm run test:browser     # 真实 Chrome（puppeteer-core）跑 14 张图（含多码）
 npm run assets           # 重新生成测试集（python + segno/pillow/numpy）
 npm run build            # 全量重建（OpenCV 源码在 .cache/opencv 或 $env:OPENCV_SRC）
 ```
@@ -27,13 +27,13 @@ npm run build            # 全量重建（OpenCV 源码在 .cache/opencv 或 $en
 - OpenCV 构建必须带 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1`，否则 `wq_init` 在 `CV_Assert(utils::fs::exists())` 抛 `StsNotImplemented`。
 - 改 `BUILD_LIST` / 模块集合后必须用 `configure-opencv.ps1 -Reconfigure`（清 build 目录），否则 CMake cache 里的 `BUILD_opencv_*=OFF` 会让模块静默消失。
 - 不要引入 pthread：单线程是"任意静态托管可用、无需 COOP/COEP"的前提。
-- 不要把 `tests/assets/`（约 33 MB 生成物）提交进仓库。
+- 不要把 `tests/assets/`（约 95 MB 生成物：PNG + 原始 RGBA）提交进仓库。
 
 ## 验证要求（改完必须跑）
 
-1. `npm test` → 期望 `decoded 27/29 assets`、`clean reference set: 5/5`、`hard tier: 8/10`（不开切图）。
+1. `npm test` → 期望 `decoded 27/29 assets`、`clean reference set: 5/5`、`hard tier: 8/10`（不开切图），且 multi-code 段 4/4 PASS（2 码、3 码、同码重复、3×3 九宫格）。
 2. `node tests/benchmark.mjs --tiles 2` → 期望 wechat_qrcode 28/29，且 BENCHMARK.md 被更新。
-3. `npm run test:browser` → 期望 `browser: decoded 12/12`，退出码 0。它需要本机 Chrome（puppeteer-core 通过 `CHROME_PATH` 或默认路径找）。
+3. `npm run test:browser` → 期望 `browser: decoded 14/14`，退出码 0。它需要本机 Chrome（puppeteer-core 通过 `CHROME_PATH` 或默认路径找）。
 4. 改了 JNI/wasm 导出 → 先 `npm run build` 再跑上面三项。
 
 已知唯一"该失败"的用例：`hard_text_zh_recompressed`（信息量已被破坏），任何解码器都解不出，别试图调参让它通过。

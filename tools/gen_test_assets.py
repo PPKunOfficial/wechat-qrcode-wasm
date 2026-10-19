@@ -163,7 +163,7 @@ def build(seed: int, out_dir: Path) -> list[dict]:
 
     entries: list[dict] = []
 
-    def emit(asset_id: str, payload: str, img: Image.Image, tags: list[str], note: str = "") -> None:
+    def write_asset(asset_id: str, img: Image.Image, meta: dict) -> None:
         img = img.convert("RGB")
         png_path = png_dir / f"{asset_id}.png"
         raw_path = raw_dir / f"{asset_id}.rgba"
@@ -173,15 +173,20 @@ def build(seed: int, out_dir: Path) -> list[dict]:
         entries.append(
             {
                 "id": asset_id,
-                "payload": payload,
                 "width": img.width,
                 "height": img.height,
                 "png": f"png/{asset_id}.png",
                 "raw": f"raw/{asset_id}.rgba",
-                "tags": tags,
-                "note": note,
+                **meta,
             }
         )
+
+    def emit(asset_id: str, payload: str, img: Image.Image, tags: list[str], note: str = "") -> None:
+        write_asset(asset_id, img, {"payload": payload, "tags": tags, "note": note})
+
+    def emit_multi(asset_id: str, payloads: list[str], img: Image.Image, note: str) -> None:
+        """Multi-code scene: `expect` is the number of distinct codes that must be decoded."""
+        write_asset(asset_id, img, {"payload": payloads[0], "payloads": payloads, "expect": len(payloads), "tags": ["multi"], "note": note})
 
     def fresh_qr(payload: str, *, scale: int, border: int = 4, error: str = "m") -> Image.Image:
         return qr_image(payload, scale=scale, border=border, error=error)
@@ -300,6 +305,48 @@ def build(seed: int, out_dir: Path) -> list[dict]:
     # 9h. rotated small code (no axis-aligned gift for the finder-pattern scan)
     img = hard_scene(PAYLOADS["wifi"], (1280, 960), 3).rotate(28, resample=Image.BICUBIC, expand=False, fillcolor=(238, 238, 238))
     emit("hard_wifi_rotated", PAYLOADS["wifi"], img, ["hard", "rotation"], "28 degrees, ~60px code")
+    # 10. multi-code scenes: the detector emits many candidate boxes (keep_top_k=100) and the
+    # decoder walks all of them, so several codes in one frame are decoded in a single call.
+    def multi_scene(payloads: list[str], size: tuple[int, int], centers: list[tuple[int, int]], qr_scale: int = 6) -> Image.Image:
+        img = scene_background(size, rng)
+        for payload, center in zip(payloads, centers):
+            img = paste_qr(img, fresh_qr(payload, scale=qr_scale), center=center)
+        return img
+
+    emit_multi(
+        "multi_two",
+        [PAYLOADS["url"], PAYLOADS["wifi"]],
+        multi_scene([PAYLOADS["url"], PAYLOADS["wifi"]], (1400, 720), [(340, 360), (1060, 360)]),
+        "two different codes in one frame",
+    )
+    emit_multi(
+        "multi_three",
+        [PAYLOADS["url"], PAYLOADS["text_zh"], PAYLOADS["wifi"]],
+        multi_scene(
+            [PAYLOADS["url"], PAYLOADS["text_zh"], PAYLOADS["wifi"]],
+            (1500, 900),
+            [(300, 230), (1180, 260), (740, 690)],
+        ),
+        "three different codes in one frame",
+    )
+    emit_multi(
+        "multi_duplicate",
+        [PAYLOADS["vcard"], PAYLOADS["vcard"]],
+        multi_scene([PAYLOADS["vcard"], PAYLOADS["vcard"]], (1200, 620), [(320, 310), (880, 310)]),
+        "same payload twice: both quads must be reported (dedup is spatial, not by text)",
+    )
+    grid_payloads = [f"https://grid.example/item{i}" for i in range(9)]
+    emit_multi(
+        "multi_grid",
+        grid_payloads,
+        multi_scene(
+            grid_payloads,
+            (1600, 1100),
+            [(310 + col * 490, 230 + row * 330) for row in range(3) for col in range(3)],
+            qr_scale=5,
+        ),
+        "3x3 grid of distinct codes",
+    )
 
     manifest = {
         "seed": seed,

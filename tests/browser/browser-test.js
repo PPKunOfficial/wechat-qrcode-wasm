@@ -25,7 +25,19 @@ const WANTED = [
   'hard_long_night',
   'hard_wifi_rotated',
   'vcard_downscale',
+  'multi_two',
+  'multi_three',
 ];
+
+/** Multi-code aware ground-truth check (same rule as tests/_harness.mjs#resultsMatchAsset). */
+function matchesAsset(asset, results) {
+  const want = new Map();
+  for (const payload of asset.payloads ?? [asset.payload]) want.set(payload, (want.get(payload) ?? 0) + 1);
+  const got = new Map();
+  for (const result of results) got.set(result.text, (got.get(result.text) ?? 0) + 1);
+  for (const [payload, count] of want) if ((got.get(payload) ?? 0) < count) return false;
+  return true;
+}
 
 function setStatus(text, cls = '') {
   statusEl.textContent = text;
@@ -80,10 +92,11 @@ async function main() {
       console.log(
         `[browser-test] ${asset.id} -> count=${result.count} ms=${result.ms} wall=${Math.round(performance.now() - t1)}`,
       );
-      const hit = result.results.find((r) => r.text === asset.payload);
+      const hit = matchesAsset(asset, result.results);
       cells[3].textContent = hit ? 'PASS' : 'FAIL';
       cells[3].className = hit ? 'pass' : 'fail';
-      cells[4].textContent = (result.results[0]?.text ?? '').slice(0, 46);
+      const texts = result.results.map((r) => r.text);
+      cells[4].textContent = (texts.length > 1 ? texts.join(' | ') : (texts[0] ?? '')).slice(0, 46);
       cells[4].className = 'payload';
       cells[5].textContent = `${Math.round(result.ms)} ms${result.tiles ? ` · ${result.tiles} tiles` : ''}`;
       if (hit) pass++;

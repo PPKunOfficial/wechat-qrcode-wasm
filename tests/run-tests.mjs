@@ -21,6 +21,7 @@ import {
   fmtMs,
   loadManifest,
   loadWrapper,
+  resultsMatchAsset,
   scanRgba,
 } from './_harness.mjs';
 
@@ -36,7 +37,9 @@ const tiles = Number(flag('--tiles', '0'));
 const pad = (s, n) => String(s).padEnd(n);
 
 async function main() {
-  const assets = filterAssets((await loadManifest()).assets, filter);
+  const all = filterAssets((await loadManifest()).assets, filter);
+  const assets = all.filter((a) => !a.tags.includes('multi'));
+  const multiAssets = all.filter((a) => a.tags.includes('multi'));
 
   const scanner = await loadWrapper({ verbose });
   console.log(`OpenCV ${scanner.opencvVersion} | wasm module + models loaded in ${fmtMs(scanner.loadMs)}`);
@@ -58,7 +61,7 @@ async function main() {
   for (const asset of assets) {
     const rgba = await readFile(join(assetsDir, asset.raw));
     const result = scanRgba(scanner, rgba, asset.width, asset.height, opts);
-    const payloadOk = result.results.some((r) => r.text === asset.payload);
+    const payloadOk = resultsMatchAsset(result.results, asset);
     totalMs += result.ms;
     if (payloadOk) decoded++;
     if (!payloadOk && asset.tags.includes('clean')) cleanFailures++;
@@ -99,9 +102,38 @@ async function main() {
   if (clean.length) console.log(`clean reference set: ${clean.filter((r) => r.ok).length}/${clean.length}`);
   if (hardTotal) console.log(`hard tier: ${hardDecoded}/${hardTotal}`);
 
+  // Multi-code scenes: one call must report every code in the frame.
+  let multiFailures = 0;
+  if (multiAssets.length) {
+    console.log('');
+    console.log(
+      `${pad('multi-code asset', 26)} ${pad('size', 11)} ${pad('expect', 7)} ${pad('got', 4)} ${pad('time', 8)} result`,
+    );
+    console.log('-'.repeat(78));
+    for (const asset of multiAssets) {
+      const rgba = await readFile(join(assetsDir, asset.raw));
+      const result = scanRgba(scanner, rgba, asset.width, asset.height, opts);
+      const ok = resultsMatchAsset(result.results, asset);
+      if (!ok) multiFailures++;
+      const expect = asset.payloads ? asset.payloads.length : 1;
+      console.log(
+        `${pad(asset.id, 26)} ${pad(`${asset.width}x${asset.height}`, 11)} ${pad(expect, 7)} ${pad(result.count, 4)} ${pad(
+          fmtMs(result.ms),
+          8,
+        )} ${ok ? 'PASS' : 'FAIL'}` +
+          (ok ? '' : `  texts=${JSON.stringify(result.results.map((r) => r.text))}`),
+      );
+    }
+    console.log('-'.repeat(78));
+  }
+
   scanner.destroy();
   if (cleanFailures > 0) {
     console.error(`\nERROR: ${cleanFailures} clean asset(s) failed to decode`);
+    process.exit(1);
+  }
+  if (multiFailures > 0) {
+    console.error(`\nERROR: ${multiFailures} multi-code asset(s) missed a code`);
     process.exit(1);
   }
 }

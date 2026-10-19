@@ -86,6 +86,16 @@ scanner.scan(canvas)
 
 `WeChatQRCode` 构造函数用 `CV_Assert(utils::fs::exists(path))` 校验模型路径。OpenCV 在 `__EMSCRIPTEN__` 下默认关闭文件系统支持（`filesystem.private.hpp` 写死为 0 → `fs::exists` 是抛异常的桩），所以构建时加 `-DOPENCV_HAVE_FILESYSTEM_SUPPORT=1`，让 POSIX 实现编译进来去 `stat()` MEMFS。JS 侧 `FS.writeFile('/models/detect.onnx', bytes)` 之后按路径传参即可——不需要改模块源码，也不需要把模型编进二进制（模型独立 fetch，可缓存、可替换）。
 
+### 4.5 多码识别
+
+`SSDDetector::forward` 解析 `DetectionOutput` 的每一行候选框（`keep_top_k = 100`），`Impl::decode` 再对每个候选框裁剪、多尺度解码，所以"一帧多码"是上游本来的能力，`detectAndDecode` 返回的 `vector<string>` / 角点本来就是多结果的。C API 只是把数组完整塞进 JSON：
+
+```json
+{"ok":true,"count":3,"results":[{"text":"...","points":[[x,y],...]}, ...]}
+```
+
+本仓库没有改这段逻辑，只补了回归覆盖（2 码 / 3 码 / 同码重复 / 3×3 九宫格）与文档。注意上游去重按角点距离 10px，同内容的两张码会保留两条结果。
+
 ### 5. 切图兜底（JS 层，不改算法）
 
 检测网络先把整帧缩到约 400×400（`targetArea = 400*400`）再推理。1920×1080 的一帧里，远处的二维码可能只剩 10~20 像素，检测器直接漏掉。`scan(..., {tiles: 2})` 在整图无结果时把原图切成 2×2、20% 重叠的块分别送进同一条 C++ 管线，再把块内坐标加回全图坐标。因为没有任何阈值改动、模型也没变，它只是把"同一个算法"作用在更有利的尺度上；不开启时行为与上游完全一致。

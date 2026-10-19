@@ -3,7 +3,7 @@
 /.cache/
 /emsdk/
 
-# generated test corpus (regenerate with: npm run assets)
+# generated test corpus (~95 MB: png + raw rgba; regenerate with: npm run assets)
 /tests/assets/
 
 # python
