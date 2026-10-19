@@ -14,9 +14,9 @@
  * when the baseline decoders are missing.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { assetsDir, filterAssets, loadManifest, loadWrapper, repoRoot, resultsMatchAsset, scanRgba } from './_harness.mjs';
 
@@ -196,12 +196,17 @@ async function main() {
   md.push('\n`✓` = payload decoded, number = milliseconds. `✗` = payload not decoded.');
   md.push('');
 
+  const writeReport = (path, text) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text);
+  };
+
   if (jsonOut) {
-    writeFileSync(jsonOut, JSON.stringify({ generatedAt: new Date().toISOString(), tiles, summary }, null, 2));
+    writeReport(jsonOut, JSON.stringify({ generatedAt: new Date().toISOString(), tiles, summary }, null, 2));
     console.log(`\nwrote ${jsonOut}`);
   }
   if (mdOut) {
-    writeFileSync(mdOut, md.join('\n'));
+    writeReport(mdOut, md.join('\n'));
     console.log(`wrote ${mdOut}`);
   }
 
