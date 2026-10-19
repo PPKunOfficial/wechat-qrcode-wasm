@@ -84,7 +84,7 @@ CV_Assert(utils::fs::exists(detector_model_path));
 - 安装目录布局（OpenCV 5.x 与 4.x 不同）：头文件在 `install/include/opencv5/opencv2/...`；模块库在 `install/lib/libopencv_*.a`；第三方静态库在 `install/lib/opencv5/3rdparty/`，且名字带双 `lib` 前缀（`liblibprotobuf.a`、`libzlib.a`、`liblibharfbuzz.a`）。
 - 静态库用 `-Wl,--start-group ... -Wl,--end-group` 包住，避免循环依赖。
 - Emscripten 关键 flag：`-fexceptions -sDISABLE_EXCEPTION_CATCHING=0`（OpenCV 用 `cv::Exception`，必须让异常穿过 wasm 边界）、`-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createWeChatQRCodeModule`、`-sFORCE_FILESYSTEM=1`、`-sALLOW_MEMORY_GROWTH=1`、`-sINITIAL_MEMORY=67108864`、`-sSTACK_SIZE=5242880`、`-sENVIRONMENT=web,worker,node`。
-- 链接完成后 `dist/wq.wasm` 约 7.4 MB（gzip 1.65 MB），`dist/wq.js` 约 70 KB。
+- 链接完成后 `dist/wq.wasm` 约 7.4 MB（gzip 1.63 MB），`dist/wq.js` 约 70 KB。
 
 ### 最小体积构建（min profile）
 
@@ -103,7 +103,7 @@ CV_Assert(utils::fs::exists(detector_model_path));
 | 内存分配器 | 默认 dlmalloc | `-sMALLOC=emmalloc` | 更小的分配器实现 |
 | JS 胶水 | 原样 | `--closure 1` | `wq.js` 71 KB → 35 KB（gzip 19 KB → 13 KB） |
 
-实测（24 核机器，同一台）：`wq.wasm` 7,803,995 → 5,942,478 字节（−24%），gzip 1,730,016 → 1,374,364（−21%）；29 张测试集准确率不变（默认 27/29，`tiles: 2` 时 28/29）。不要手工在 Emscripten 产物上再跑 `wasm-opt`：需要精确的 feature 集合（bulk-memory、exception-handling 等），猜错会生成 ID 非法的模块、浏览器直接 `CompileError`；`-Oz` 已经让 Emscripten 用正确的参数调过 binaryen 了。
+实测（24 核机器，同一台）：`wq.wasm` 7,803,995 → 5,942,478 字节（−24%），gzip 1,714,194 → 1,358,945（−21%）；29 张测试集准确率不变（默认 27/29，`tiles: 2` 时 28/29）。不要手工在 Emscripten 产物上再跑 `wasm-opt`：需要精确的 feature 集合（bulk-memory、exception-handling 等），猜错会生成 ID 非法的模块、浏览器直接 `CompileError`；`-Oz` 已经让 Emscripten 用正确的参数调过 binaryen 了。
 
 注意：最小版把 OpenCV 编译到单独的 `build/opencv-wasm-min/`，不会覆盖标准版的 `build/opencv-wasm/`，两套产物可以并存。
 

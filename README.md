@@ -3,8 +3,8 @@
 [![CI](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/PPKunOfficial/wechat-qrcode-wasm)](https://github.com/PPKunOfficial/wechat-qrcode-wasm/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![wasm: 7.4 MB](https://img.shields.io/badge/wasm-7.4%20MB%20%C2%B7%201.65%20MB%20gzip-654ff0)](dist/wq.wasm)
-[![wasm min: 5.7 MB](https://img.shields.io/badge/wasm%20min-5.7%20MB%20%C2%B7%201.31%20MB%20gzip-2ea44f)](dist/wq.min.wasm)
+[![wasm: 7.4 MB](https://img.shields.io/badge/wasm-7.4%20MB%20%C2%B7%201.63%20MB%20gzip-654ff0)](dist/wq.wasm)
+[![wasm min: 5.7 MB](https://img.shields.io/badge/wasm%20min-5.7%20MB%20%C2%B7%201.30%20MB%20gzip-2ea44f)](dist/wq.min.wasm)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](package.json)
 
 把 **OpenCV 5.x 的 `wechat_qrcode` 模块**（微信扫码同款算法：SSD 神经网络检测 + 超分辨率 + zxing 多二值化解码）完整编译成 WebAssembly，供前端在浏览器 / Web Worker / Node 中调用。没有原生插件、没有 ONNX Runtime：推理跑在 OpenCV 自己的 `dnn` 模块里，纯 WASM。
@@ -35,7 +35,7 @@
 - 唯一三边都没解出的是 `hard_text_zh_recompressed`（先缩到 0.35 再模糊再加噪声，已超出可恢复信息量），保留在基准里作为"极限"参照。
 - **多码同时识别**：一帧里的多个二维码一次调用全部返回（`count` / `results[]`），检测与解码都是上游本来就支持的路径。实测 2 码 / 3 码 / 同码重复 / 3×3 九宫格（1600×1100）全部完整返回，耗时仍 ~60 ms（9 码 ~70 ms）。回归测试见 `npm test` 的 multi-code 段。
 - 浏览器端自动化验证（真实 Chrome，`npm run test:browser`）：**14/14** 通过（含 2 码、3 码场景），单帧 57–65 ms（`hard_url_far` 走 4 块切图兜底，274 ms）。
-- 产物体积：标准版 `wq.wasm` 7.44 MB（gzip 1.65 MB）+ `wq.js` 70 KB；另有最小体积版 `wq.min.wasm` 5.67 MB（gzip 1.31 MB）+ `wq.min.js` 35 KB，准确率相同、单帧慢约 45%（见[两个体积版本](#两个体积版本)）。两个模型共 1 MB。
+- 产物体积：标准版 `wq.wasm` 7.44 MB（gzip 1.63 MB）+ `wq.js` 70 KB；另有最小体积版 `wq.min.wasm` 5.67 MB（gzip 1.30 MB）+ `wq.min.js` 35 KB，准确率相同、单帧慢约 45%（见[两个体积版本](#两个体积版本)）。两个模型共 1 MB。
 
 ![demo 页面](docs/demo.png)
 
@@ -45,8 +45,8 @@
 
 | 版本 | 文件 | 体积 | gzip (level 9) | 29 张测试集平均单帧 | 适合 |
 | --- | --- | --- | --- | --- | --- |
-| **标准版**（默认） | `dist/wq.js` + `dist/wq.wasm` | 7.44 MB | **1.65 MB** | ~71 ms | 速度优先（默认选择） |
-| **最小体积版** | `dist/wq.min.js` + `dist/wq.min.wasm` | 5.67 MB | **1.31 MB** | ~104 ms | 首屏/移动网络/体积敏感 |
+| **标准版**（默认） | `dist/wq.js` + `dist/wq.wasm` | 7.44 MB | **1.63 MB** | ~71 ms | 速度优先（默认选择） |
+| **最小体积版** | `dist/wq.min.js` + `dist/wq.min.wasm` | 5.67 MB | **1.30 MB** | ~104 ms | 首屏/移动网络/体积敏感 |
 
 体积 −24%（gzip −21%），代价是单帧约 +45%。准确率完全一致：默认 27/29、`tiles: 2` 时 28/29（干净集 5/5，hard 档 8/10 → 9/10）。
 

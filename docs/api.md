@@ -4,7 +4,7 @@
 
 ## 两套构建产物
 
-`dist/` 里有标准版（`wq.js` + `wq.wasm`，7.44 MB，gzip 1.65 MB）和最小体积版（`wq.min.js` + `wq.min.wasm`，5.67 MB，gzip 1.31 MB）。两者 API、准确率完全一致，只有体积和速度差别（min 单帧慢约 45%）。
+`dist/` 里有标准版（`wq.js` + `wq.wasm`，7.44 MB，gzip 1.63 MB）和最小体积版（`wq.min.js` + `wq.min.wasm`，5.67 MB，gzip 1.30 MB）。两者 API、准确率完全一致，只有体积和速度差别（min 单帧慢约 45%）。
 
 不传 `moduleFactory` 时 `createScanner` 用标准版；要用最小版就自己 import 对应工厂（wasm 文件由 Emscripten 按 JS 的 `import.meta.url` 自动定位到同目录）：
 
